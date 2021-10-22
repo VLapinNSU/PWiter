@@ -1,4 +1,4 @@
-﻿! make matrix A where p = A*w for radial fracture, and calculates width from pressure
+﻿! make matrix T where p = T*w for radial fracture, and calculates width from pressure
 ! elements are constant
  module elasticRadial
 implicit none 
@@ -7,8 +7,8 @@ implicit none
 
 !=================================================================================!
 ! Subprogram: test matrix calculating for elastic radial fracture
-!             W_k = A_k_i * p_i 
-! The subroutine calculates matrix matrWfromP where A_k_i = matrWfromP * 4*(1-\nu)/(\pi*\mu)
+!             W_k = T_k_i * p_i 
+! The subroutine calculates matrix matrWfromP where T_k_i = matrWfromP * 4*(1-\nu)/(\pi*\mu)
 !=================================================================================! 
 subroutine testElasticMatrixRadial()    
 real(8), allocatable :: xx(:)                           ! mesh, cell boundaries [0;Rfrac], [0..NN]
@@ -43,15 +43,15 @@ end subroutine testElasticMatrixRadial
     
 !=================================================================================!
 ! Subprogram: counts elements of auxiliary matrices of width-pressure connection 
-!             W_k = A_k_i * p_i 
-! The subroutine calculates matrix matrWfromP where A_k_i = matrWfromP * 4*(1-\nu)/(\pi*\mu)
+!             W_k = T_k_i * p_i 
+! The subroutine calculates matrix matrWfromP where T_k_i = matrWfromP * 4*(1-\nu)/(\pi*\mu)
 !=================================================================================! 
 subroutine makeElasticMatrixRadial(xx,Rfrac,NN, matrWfromP)
 real(8), intent(IN ) :: xx(0:NN)            ! mesh [R_w;R_out], [0..NN]
 integer, intent(IN ) :: NN                  ! mesh size
 real(8), intent(IN ) :: Rfrac               ! frac radius
 
-real(8), intent(OUT) :: matrWfromP(:,:)     ! matrix for w_k = A^s_k*p_s
+real(8), intent(OUT) :: matrWfromP(:,:)     ! matrix for w_k = T^s_k*p_s
 
 real(8), allocatable :: R_c(:,:)                    ! Auxiliary matrices
 
@@ -62,7 +62,7 @@ integer :: k,i,j
     allocate(R_c(1:NN,1:NN))
     ! calculate nodes and weights for Gauss quadrature rule
     call Gauss_points(6, xi, ww )
-    ! Calculate auxilary matrices R_a, R_b, R_c to combine them into connection matrix A_pw further
+    ! Calculate auxilary matrices R_a, R_b, R_c to combine them into connection matrix T_pw further
     do k = 1, NN
         ! for each point (k)
         do i = 1, NN
@@ -71,7 +71,7 @@ integer :: k,i,j
             R_c(i,j) = make_R(xx,i,j,1,rr,xi,ww,6)
         enddo
         enddo 
-        ! Calculate A_pw(k,l,j,s)
+        ! Calculate T_pw(k,l,j,s)
         do j = 1, NN
             matrWfromP(k,j) = 0.d0
             do i = 1, NN
@@ -88,9 +88,9 @@ end subroutine makeElasticMatrixRadial
 
 !=================================================================================!
 ! Subprogram: counts elements of auxiliary matrices of width-pressure connection 
-!             W_k = A_k_i * p_i 
+!             W_k = T_k_i * p_i 
 ! The subroutine is required to calculate integrals for obtaining elements
-! of matrix A_k_i
+! of matrix T_k_i
 !=================================================================================! 
     
 function make_R(xx,i,j,ind,rr,xi,ww,Ngauss) result(Rez)
