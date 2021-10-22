@@ -8,7 +8,7 @@ implicit none
 !=================================================================================!
 ! Subprogram: test matrix calculating for elastic radial fracture
 !             W_k = T_k_i * p_i 
-! The subroutine calculates matrix matrWfromP where T_k_i = matrWfromP * 4*(1-\nu)/(\pi*\mu)
+! The subroutine check calculated matrix matrWfromP where T_k_i = matrWfromP * 4*(1-\nu)/(\pi*\mu) on constant pressure
 !=================================================================================! 
 subroutine testElasticMatrixRadial()    
 real(8), allocatable :: xx(:)                           ! mesh, cell boundaries [0;Rfrac], [0..NN]

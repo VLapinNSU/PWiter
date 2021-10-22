@@ -29,5 +29,6 @@
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
 		<File RelativePath=".\3dplot.f90"/>
 		<File RelativePath=".\elasticRadial.f90"/>
+		<File RelativePath=".\FluidRadial.f90"/>
 		<File RelativePath=".\functionsFG.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>
