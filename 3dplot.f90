@@ -1,5 +1,6 @@
 ﻿PROGRAM demo
 use functionsFG                     ! функции удобно выновить в модули, тогда файл меньше
+use elasticRadial
 implicit none                       ! это запрещает использование неописанных переменных 
 integer, parameter :: Nmax = 4    ! позволяет менять размеры сразу у всех массивов
 ! real(8) - двойная точность. real - одинарная. обычно используют двойную
@@ -13,6 +14,7 @@ integer, dimension(Nmax) :: IPIV
 real :: eps, differenceP, differenceW, qin, pout    ! но лучше комментарии какие-то делать
 integer :: i, j, iter, l, mu, E, h, dt, INFO, k          ! надо все переменные описывать (мы же запретили implicit none)
 integer :: NN          ! используемый размер массива не обязан совпадать с самим размером. Позволяет менять его без перекомпиляции программы
+call testElasticMatrixRadial()
 !TODO: задание параметров в отдельную subroutine initParam
 NN = Nmax
 eps = 0.001
