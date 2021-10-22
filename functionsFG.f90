@@ -5,9 +5,9 @@ contains
 
 function Ffunc(P, W, dt, qin, mu, h) result(func)
 implicit none 
-real ::  qin
+real(8) ::  qin
 integer:: mu, h, dt 
-real, dimension(2) :: P, W, func
+real(8), dimension(2) :: P, W, func
     func(1) = W(1)/dt - qin/h - 12*mu / (0.5*(W(1)+W(2))**3) * (P(1)-P(2))/h**2 ! не должно быть деления на ноль
     func(2) = W(2)/dt + 0 + 12*mu / (0.5*(W(1)+W(2))**3) * (P(1)-P(2))/h**2
 end function
@@ -15,16 +15,16 @@ end function
 function Gfunc(P, W, T, h, E) result(func)
 implicit none 
 integer:: h, E 
-real, dimension(2,2) :: T
-real, dimension(2) :: P, W, func
+real(8), dimension(2,2) :: T
+real(8), dimension(2) :: P, W, func
     func(1) = T(1,1)*P(1)+ T(1,2)*P(2) - W(1)
     func(2) = T(2,1)*P(1)+ T(2,2)*P(2) - W(2)
 end function
 
 function dFdx(Pk, Wk, NN) result(Aout) 
-real, intent (IN) :: Pk(:), Wk(:)
+real(8), intent (IN) :: Pk(:), Wk(:)
 integer, intent (IN) :: NN
-real, dimension(NN,NN) :: Aout
+real(8), dimension(NN,NN) :: Aout
 integer:: i, j
 do i = 1, NN
   do j = 1, NN
@@ -64,7 +64,7 @@ end do
 end function
     
 function invertMatrix(Ain, NN) result(Aout) 
-real, intent (IN) :: Ain(:,:)      
+real(8), intent (IN) :: Ain(:,:)      
 integer, intent (IN) :: NN
 real(8), dimension(1:NN,1:NN) :: A, Aout
 integer:: INFO, i, j
@@ -85,8 +85,8 @@ end function
 ! вывод в файл графика двумерной функции на равномерной ортогональной сетке
 subroutine Grafik2D(X,Y,Func,NN,filename)       
 implicit none 
-real, intent (IN) :: Func(:,:)                ! процедуре не обязательно знать максимальный размер, но используемый размер нужен
-real, intent (IN) :: X(:), Y(:)      
+real(8), intent (IN) :: Func(:,:)                ! процедуре не обязательно знать максимальный размер, но используемый размер нужен
+real(8), intent (IN) :: X(:), Y(:)      
 integer, intent (IN) :: NN
 character(*), intent (IN) :: filename 
 integer :: i,j 
