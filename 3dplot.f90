@@ -37,7 +37,7 @@ real(8) :: XX(1:Nmax)               ! mesh, cell boundaries [0;Rfrac], [0..NN]
     Wn = 0.d0
     ! initial step, to make fluid matrix 
     call makeElasticMatrixRadial(xx,Rfrac,NN, matrWfromP)    
-    matrPfromW = invertMatrix(matrWfromP(1:NN,1:NN), NN)
+    matrPfromW = invertMatrix(matrWfromP(1:NN,1:NN), NN)            !TODO: у меня обращение матрицы работает. Не могу воспроизвести ошибку
     pout = 0.01d0
     P = pout
     W(1:NN) = matmul(matrWfromP(1:NN,1:NN),P(1:NN))*ElasticCoef
