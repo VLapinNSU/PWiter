@@ -21,6 +21,64 @@ real, dimension(2) :: P, W, func
     func(2) = T(2,1)*P(1)+ T(2,2)*P(2) - W(2)
 end function
 
+function Ffunction(P, W, dt, hh, pi, qin, xx, matrAp, NN) result(func)
+implicit none 
+integer:: i, j, NN
+real(8) :: hh, dt, qin, pi
+real, dimension(NN) :: P, W, func, xx
+real(8) :: matrAp(NN,NN)   
+do i = 1, NN
+    do j = 1, NN
+        func(i) = W(i)/dt - matrAp(i,j)*P(j)
+    end do
+    if(i==1) then
+        func(1) = func(1) - qin / (2.d0*pi) / xx(1) / hh
+    end if
+end do
+end function
+    
+function Gfunction(P, W, matrPfromW, NN) result(func)
+implicit none 
+real, dimension(NN) :: P, W
+real(8) :: matrPfromW(NN,NN)    
+integer:: i, j, NN
+real, dimension(NN) ::  func
+do i = 1, NN
+    func(i) = P(i)
+    do j = 1, NN
+        func(i) = func(i) - matrPfromW(i,j) * W(j)
+    end do
+end do
+end function
+
+subroutine RelaxMethod(P0, W0, N, dt, qin, hh, eps, relax, matrPfromW, xx, matrAp)
+integer:: N, i
+real(8) :: hh, dt, qin, pi, eps, differenceP, differenceW
+real, dimension(2*N) :: relax !(1:N) - для F, (N+1:2N) - для G
+real, dimension(N) :: P0, W0, F, G, Pn, Wn, xx
+real(8) :: matrPfromW(N,N), matrAp(N, N)      
+differenceP = 1.0
+differenceW = 1.0 
+do while(max(differenceP, differenceW) > eps)   
+        F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrAp, N)
+        G = Gfunction(P0, W0, matrPfromW, N)
+        do i = 1, N
+            Pn(i) = P0(i) - relax(i)*F(i)
+            Wn(i) = W0(i) - relax(i+N)*G(i)
+        end do
+        differenceP = 0.0
+        differenceW = 0.0
+        do i = 1, N
+            differenceP = max(differenceP, ABS(P0(i)-Pn(i)))
+            differenceW = max(differenceW, ABS(W0(i)-Wn(i)))
+        end do
+        do i = 1, N
+          P0(i) = Pn(i)
+          W0(i) = Wn(i)
+        end do
+end do
+end subroutine
+
 subroutine initParam(eps, mu, E, qin, h, pout, dt, T, N)
 real :: eps, qin, pout 
 real, dimension(N/2, N/2) :: T
@@ -148,6 +206,25 @@ do i = 1, NN ! единичная матрица
       end do
 end do
 CALL DGESV(NN, NN, A, NN, IPIV, Aout, NN, INFO)
+end function 
+
+function ConvertMatrix(Ain, NN) result(A) ! По заданным элементам, расположенным на трех диагоналях, строим матрицу
+real, intent (IN) :: Ain(:,:)      
+integer, intent (IN) :: NN
+real(8), dimension(1:NN,1:NN) :: A
+integer:: i, j
+do i = 1, NN 
+  do j = 1, NN
+      A(i, j)= 0.0
+      A(i, i-1) = Ain(1,i)
+      A(i, i) = Ain(2,i)
+      A(i, i+1) = Ain(3,i)   
+  end do
+end do
+A(1, 1) = Ain(2,1)
+A(1, 2) = Ain(3,1)
+A(NN, NN-1) = Ain(1,NN)
+A(NN, NN) = Ain(2,NN)
 end function 
 
 subroutine NewtonStart(P0, W0, N, dt, qin, mu, h, T, E, eps)
