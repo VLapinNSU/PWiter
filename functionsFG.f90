@@ -3,33 +3,16 @@ implicit none
 
 contains 
 
-function Ffunc(P, W, dt, qin, mu, h) result(func)
-implicit none 
-real ::  qin
-integer:: mu, h, dt 
-real, dimension(2) :: P, W, func
-    func(1) = W(1)/dt - qin/h - 12*mu / (0.5*(W(1)+W(2))**3) * (P(1)-P(2))/h**2 ! не должно быть деления на ноль
-    func(2) = W(2)/dt + 0 + 12*mu / (0.5*(W(1)+W(2))**3) * (P(1)-P(2))/h**2
-end function
-    
-function Gfunc(P, W, T, h, E) result(func)
-implicit none 
-integer:: h, E 
-real, dimension(2,2) :: T
-real, dimension(2) :: P, W, func
-    func(1) = T(1,1)*P(1)+ T(1,2)*P(2) - W(1)
-    func(2) = T(2,1)*P(1)+ T(2,2)*P(2) - W(2)
-end function
-
 function Ffunction(P, W, dt, hh, pi, qin, xx, matrAp, NN) result(func)
 implicit none 
 integer:: i, j, NN
 real(8) :: hh, dt, qin, pi
-real, dimension(NN) :: P, W, func, xx
+real(8), dimension(NN) :: P, W, func, xx
 real(8) :: matrAp(NN,NN)   
 do i = 1, NN
+    func(i) = W(i)/dt
     do j = 1, NN
-        func(i) = W(i)/dt - matrAp(i,j)*P(j)
+        func(i) = func(i) - matrAp(i,j)*P(j)
     end do
     if(i==1) then
         func(1) = func(1) - qin / (2.d0*pi) / xx(1) / hh
@@ -39,10 +22,10 @@ end function
     
 function Gfunction(P, W, matrPfromW, NN) result(func)
 implicit none 
-real, dimension(NN) :: P, W
+real(8), dimension(NN) :: P, W
 real(8) :: matrPfromW(NN,NN)    
 integer:: i, j, NN
-real, dimension(NN) ::  func
+real(8), dimension(NN) ::  func
 do i = 1, NN
     func(i) = P(i)
     do j = 1, NN
@@ -51,15 +34,22 @@ do i = 1, NN
 end do
 end function
 
-subroutine RelaxMethod(P0, W0, N, dt, qin, hh, eps, relax, matrPfromW, xx, matrAp)
+subroutine RelaxMethod(P0, W0, N, dt, qin, pi, hh, eps, relax, matrPfromW, xx, matrAp)
 integer:: N, i
 real(8) :: hh, dt, qin, pi, eps, differenceP, differenceW
-real, dimension(2*N) :: relax !(1:N) - для F, (N+1:2N) - для G
-real, dimension(N) :: P0, W0, F, G, Pn, Wn, xx
+real(8), dimension(2*N) :: relax !(1:N) - для F, (N+1:2N) - для G
+real(8), dimension(N) :: P0, W0, F, G, Pn, Wn, xx
 real(8) :: matrPfromW(N,N), matrAp(N, N)      
 differenceP = 1.0
 differenceW = 1.0 
-do while(max(differenceP, differenceW) > eps)   
+do while(max(differenceP, differenceW) > eps)  
+        do i = 1, N
+            Print*, P0(i)
+        end do
+        do i = 1, N
+            Print*, W0(i)
+        end do
+        Print*, '    '
         F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrAp, N)
         G = Gfunction(P0, W0, matrPfromW, N)
         do i = 1, N
@@ -76,12 +66,168 @@ do while(max(differenceP, differenceW) > eps)
           P0(i) = Pn(i)
           W0(i) = Wn(i)
         end do
-end do
+end do        
 end subroutine
 
+function dFdxForNewton(matrAp, matrPfromW, dt, N) result(Aout) 
+integer, intent (IN) :: N
+real(8) :: dt
+real(8) :: matrPfromW(N,N), matrAp(N, N) 
+real(8), dimension(2*N,2*N) :: Aout
+integer:: i, j
+do i = 1, 2*N
+  do j = 1, 2*N
+      if (i <= N) then
+          if (j <= N) then
+                Aout(i,j) = matrAp(i,j)
+          else
+              Aout(i,j) = 1/dt
+          end if    
+      else
+          if (j <= N) then
+              Aout(i,j) = 1 
+          else
+                Aout(i,j) = - matrPfromW(i-N,j-N)
+          end if  
+      end if    
+  end do
+end do
+end function
+
+subroutine NewtonMethod(P0, W0, N, dt, qin, pi, hh, eps, matrPfromW, xx, matrAp)
+integer:: N, i, j
+real(8) :: hh, dt, pi, qin, eps, differenceP, differenceW
+real(8), dimension(N) :: P0, W0, F, G, Pn, Wn, xx
+real(8) :: matrPfromW(N,N), matrAp(N, N)  
+real(8), dimension(1:2*N, 1:2*N) :: Ainvert
+real(8), dimension(2*N, 2*N) :: A
+differenceP = 1.0
+differenceW = 1.0 
+do while(max(differenceP, differenceW) > eps)   
+    do i = 1, N
+        Print*, P0(i)
+    end do
+    do i = 1, N
+        Print*, W0(i)
+    end do
+    Print*, '    '
+    F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrAp, N)
+    G = Gfunction(P0, W0, matrPfromW, N)
+    A = dFdxForNewton(matrAp, matrPfromW, dt, N)
+    Ainvert = invertMatrix(A, 2*N)
+    do i = 1, N
+        Pn(i) = P0(i)
+        Wn(i) = W0(i)
+        do j = 1, N
+            Pn(i) = Pn(i) - Ainvert(i,j)*F(j) - Ainvert(i,j+N)*G(j)
+            Wn(i) = Wn(i) - Ainvert(i+N,j)*F(j) - Ainvert(i+N,j+N)*G(j)
+      end do
+    end do
+    differenceP = 0.0
+    differenceW = 0.0
+    do i = 1, N
+       differenceP = max(differenceP, ABS(P0(i)-Pn(i)))
+       differenceW = max(differenceW, ABS(W0(i)-Wn(i)))
+    end do
+    do i = 1, N
+        P0(i) = Pn(i)
+        W0(i) = Wn(i)
+    end do
+end do
+end subroutine
+    
+function invertMatrix(Ain, NN) result(Aout) 
+real(8), intent (IN) :: Ain(:,:)      
+integer, intent (IN) :: NN
+real(8), dimension(1:NN,1:NN) :: A, Aout
+integer:: INFO, i, j
+integer, dimension(NN) :: IPIV
+do i = 1, NN ! единичная матрица
+  do j = 1, NN
+      if((i>j).or.(j>i)) then
+      Aout(i,j)=0.0
+      else if(i==j) then
+          Aout(i,j)= 1.0
+      end if
+      A(i,j)= Ain(i,j)
+      end do
+end do
+CALL DGESV(NN, NN, A, NN, IPIV, Aout, NN, INFO)
+end function 
+
+function ConvertMatrix(Ain, NN) result(A) ! По заданным элементам, расположенным на трех диагоналях, строим матрицу
+real(8), intent (IN) :: Ain(3,NN)      
+integer, intent (IN) :: NN
+real(8), dimension(NN,NN) :: A
+integer:: i, j
+do i = 1, NN 
+  do j = 1, NN
+      A(i, j) = 0.0
+      if ((i>1).and.(i<NN)) then
+        A(i, i-1) = Ain(1,i)
+        A(i, i) = Ain(2,i)
+        A(i, i+1) = Ain(3,i) 
+      end if
+  end do
+end do
+A(1, 1) = Ain(2,1)
+A(1, 2) = Ain(3,1)
+A(NN, NN-1) = Ain(1,NN)
+A(NN, NN) = Ain(2,NN)
+end function 
+
+subroutine PrintMatrix(A,N,M)
+real(8), intent (IN) :: A(:,:)      
+integer, intent (IN) :: N, M
+integer :: i, j
+Print *, 'Matrix: '
+do i = 1, N
+    do j = 1,M
+        Print *, A(i, j)
+    end do
+    Print *, '   '
+end do    
+end subroutine
+
+subroutine PrintMultMatrix(A,B,N)
+real(8), dimension(N,N) :: A
+real(8), dimension(1:N,1:N) :: B, D
+integer, intent (IN) :: N
+integer :: i, j, k
+Print *, 'Multiplication result : '
+do i = 1, N
+    do j = 1, N
+        D(i, j) = 0
+        do k = 1, N
+        D(i, j) = D(i, j) + A(i, k) * B(k, j)
+        end do
+        PRINT*, D(i,j)
+    end do
+    Print*, ' '
+end do   
+end subroutine
+
+function Ffunc(P, W, dt, qin, mu, h) result(func)
+implicit none 
+real(8) ::  qin
+integer:: mu, h, dt 
+real(8), dimension(2) :: P, W, func
+    func(1) = W(1)/dt - qin/h - 12*mu / (0.5*(W(1)+W(2))**3) * (P(1)-P(2))/h**2 ! не должно быть деления на ноль
+    func(2) = W(2)/dt + 0 + 12*mu / (0.5*(W(1)+W(2))**3) * (P(1)-P(2))/h**2
+end function
+    
+function Gfunc(P, W, T, h, E) result(func)
+implicit none 
+integer:: h, E 
+real(8), dimension(2,2) :: T
+real(8), dimension(2) :: P, W, func
+    func(1) = T(1,1)*P(1)+ T(1,2)*P(2) - W(1)
+    func(2) = T(2,1)*P(1)+ T(2,2)*P(2) - W(2)
+end function
+
 subroutine initParam(eps, mu, E, qin, h, pout, dt, T, N)
-real :: eps, qin, pout 
-real, dimension(N/2, N/2) :: T
+real(8) :: eps, qin, pout 
+real(8), dimension(N/2, N/2) :: T
 integer :: mu, E, h, dt, N
 eps = 0.00001
 mu=1
@@ -97,9 +243,9 @@ T(2,2)= 2.0*(2.0*h*(1.0-9.0/16.0)**0.5/E)/3.0
 end subroutine
 
 function dFdx(Pk, Wk, NN) result(Aout) 
-real, intent (IN) :: Pk(:), Wk(:)
+real(8), intent (IN) :: Pk(:), Wk(:)
 integer, intent (IN) :: NN
-real, dimension(NN,NN) :: Aout
+real(8), dimension(NN,NN) :: Aout
 integer:: i, j
 do i = 1, NN
   do j = 1, NN
@@ -139,7 +285,7 @@ end do
 end function
 
 subroutine NewtonInit(P, W, N)
-real, dimension(N/2) :: P, W
+real(8), dimension(N/2) :: P, W
 integer, intent (IN) :: N
 integer :: i
 do i = 1, N/2
@@ -149,7 +295,7 @@ end do
 end subroutine
 
 subroutine RelaxInit(P, W, N)
-real, dimension(N/2) :: P, W
+real(8), dimension(N/2) :: P, W
 integer, intent (IN) :: N
 integer :: i
 do i = 1, N/2
@@ -158,82 +304,13 @@ do i = 1, N/2
 end do
 end subroutine
 
-subroutine PrintMatrix(A,N)
-real, intent (IN) :: A(:,:)      
-integer, intent (IN) :: N
-integer :: i, j
-Print *, 'Matrix: '
-do i = 1, N
-    do j = 1,N
-        Print *, A(i, j)
-    end do
-    Print *, '   '
-end do    
-end subroutine
-
-subroutine PrintMultMatrix(A,B,N)
-real, dimension(N,N) :: A
-real(8), dimension(1:N,1:N) :: B, D
-integer, intent (IN) :: N
-integer :: i, j, k
-Print *, 'Multiplication result : '
-do i = 1, N
-    do j = 1, N
-        D(i, j) = 0
-        do k = 1, N
-        D(i, j) = D(i, j) + A(i, k) * B(k, j)
-        end do
-        PRINT*, D(i,j)
-    end do
-    Print*, ' '
-end do   
-end subroutine
-    
-function invertMatrix(Ain, NN) result(Aout) 
-real, intent (IN) :: Ain(:,:)      
-integer, intent (IN) :: NN
-real(8), dimension(1:NN,1:NN) :: A, Aout
-integer:: INFO, i, j
-integer, dimension(NN) :: IPIV
-do i = 1, NN ! единичная матрица
-  do j = 1, NN
-      if((i>j).or.(j>i)) then
-      Aout(i,j)=0.0
-      else if(i==j) then
-          Aout(i,j)= 1.0
-      end if
-      A(i,j)= Ain(i,j)
-      end do
-end do
-CALL DGESV(NN, NN, A, NN, IPIV, Aout, NN, INFO)
-end function 
-
-function ConvertMatrix(Ain, NN) result(A) ! По заданным элементам, расположенным на трех диагоналях, строим матрицу
-real, intent (IN) :: Ain(:,:)      
-integer, intent (IN) :: NN
-real(8), dimension(1:NN,1:NN) :: A
-integer:: i, j
-do i = 1, NN 
-  do j = 1, NN
-      A(i, j)= 0.0
-      A(i, i-1) = Ain(1,i)
-      A(i, i) = Ain(2,i)
-      A(i, i+1) = Ain(3,i)   
-  end do
-end do
-A(1, 1) = Ain(2,1)
-A(1, 2) = Ain(3,1)
-A(NN, NN-1) = Ain(1,NN)
-A(NN, NN) = Ain(2,NN)
-end function 
-
 subroutine NewtonStart(P0, W0, N, dt, qin, mu, h, T, E, eps)
-real ::  qin, eps, differenceP, differenceW
+real(8) ::  qin, eps, differenceP, differenceW
 integer:: mu, h, dt, E, N, i
-real, dimension(N/2, N/2) :: T
-real, dimension(N/2) :: P0, W0, Fn, Gn, Pk, Wk
+real(8), dimension(N/2, N/2) :: T
+real(8), dimension(N/2) :: P0, W0, Fn, Gn, Pk, Wk
 real(8), dimension(1:N, 1:N) :: Ainvert
-real, dimension(N, N) :: A
+real(8), dimension(N, N) :: A
 differenceP = 1.0
 differenceW = 1.0 
 do while(max(differenceP, differenceW) > eps)    
@@ -257,12 +334,12 @@ PRINT*, P0(1), P0(2), W0(1), W0(2)
 end subroutine
 
 subroutine RelaxStart(P1, W1, N, dt, qin, mu, h, T, E, eps, relax)
-real ::  qin, eps, differenceP, differenceW
+real(8) ::  qin, eps, differenceP, differenceW
 integer:: mu, h, dt, E, N, k, i
-real, dimension(N/2, N/2) :: T, relax
-real, dimension(N/2) :: P1, W1, Fr, Gr, Pn, Wn
+real(8), dimension(N/2, N/2) :: T, relax
+real(8), dimension(N/2) :: P1, W1, Fr, Gr, Pn, Wn
 real(8), dimension(1:N, 1:N) :: Ainvert
-real, dimension(N, N) :: A
+real(8), dimension(N, N) :: A
 differenceP = 1.0
 differenceW = 1.0 
 !do while(max(differenceP, differenceW) >= eps)
@@ -287,8 +364,8 @@ end subroutine
 ! вывод в файл графика двумерной функции на равномерной ортогональной сетке
 subroutine Grafik2D(X,Y,Func,NN,filename)       
 implicit none 
-real, intent (IN) :: Func(:,:)                ! процедуре не обязательно знать максимальный размер, но используемый размер нужен
-real, intent (IN) :: X(:), Y(:)      
+real(8), intent (IN) :: Func(:,:)                ! процедуре не обязательно знать максимальный размер, но используемый размер нужен
+real(8), intent (IN) :: X(:), Y(:)      
 integer, intent (IN) :: NN
 character(*), intent (IN) :: filename 
 integer :: i,j 
