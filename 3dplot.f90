@@ -5,15 +5,14 @@ use fluidRadial
 implicit none                       ! это запрещает использование неописанных переменных 
 integer, parameter :: Nmax = 4    ! позволяет менять размеры сразу у всех массивов
 ! real(8) - двойная точность. real - одинарная. обычно используют двойную
-real, dimension(Nmax,Nmax) :: F 
-real, dimension(Nmax,Nmax) :: G  
-real, dimension(Nmax) :: P, W, Wn
-real, dimension(2,2) :: T, relax  
-real, dimension(2) :: P0, W0, P1, W1
-real :: eps, qin, pout
-integer :: i, mu, E, h, dt  
+real(8), dimension(Nmax,Nmax) :: F, G, A
+real(8), dimension(2*Nmax, 2*Nmax) :: B
+real(8), dimension(1:2*Nmax, 1:2*Nmax) :: C
+real(8), dimension(Nmax) :: P, W, Wn, P0, W0, P1, W1
+real(8), dimension(2*Nmax) :: relax  
+real(8) :: eps, pout, hh
+integer :: i
 integer :: NN          ! используемый размер массива не обязан совпадать с самим размером. Позволяет менять его без перекомпиляции программы
-
 ! параметры для новых функций
 real(8) :: ElasticCoef, Rfrac       ! elastic and mesh parameters    !TODO: make common subroutine for all parameters
 real(8) :: matrWfromP(Nmax,Nmax), matrPfromW(Nmax,Nmax)          ! matrix for w_k = T^s_k*p_s
@@ -35,11 +34,11 @@ xx = (/ (i, i = 0, NN) /) * Rfrac/NN    ! build mesh
 Wn = 0.d0
 ! initial step, to make fluid matrix 
 call makeElasticMatrixRadial(xx,Rfrac,NN, matrWfromP)    
-!matrPfromW = invertMatrix(matrWfromP(1:NN,1:NN), NN)   ! У меня выдает ошибку, говорит, что что-то не так с типом matrWfromP
+matrPfromW = invertMatrix(matrWfromP(1:NN,1:NN), NN)  
 pout = 0.01d0
 P = pout
 W(1:NN) = matmul(matrWfromP(1:NN,1:NN),P(1:NN))*ElasticCoef
-!call makeFluidMatrixAndRHSRadial(xx,NN,fluidParams,W,Wn,matrAp,RHS)  ! У меня еще вот эта функция не работает (говорит, что тип W и Wn не тот, что в функции)
+call makeFluidMatrixAndRHSRadial(xx,NN,fluidParams,W,Wn,matrAp,RHS)
 !TODO: новые функции считаются как 
 !Ffunc(1) = W/dt - matrAp*P - fluidParams%qin / (2.d0*pi) / xx(1) / hh
 !Ffunc(остальные) = W/dt - matrAp*P 
@@ -48,22 +47,26 @@ W(1:NN) = matmul(matrWfromP(1:NN,1:NN),P(1:NN))*ElasticCoef
 ! Gfunc = W - matrWfromP * P или Gfunc = P - matrPfromW * W
 ! для обобщения будет удобнее с matrPfromW, но можно начать с любого варианта
 ! matrPfromW, matrWfromP считаются один раз и записаны как обычные матрицы
-    
+
+eps = 0.001
+hh = xx(2)-xx(1) ! не нашла, где взять значение
 NN = Nmax
-call initParam(eps, mu, E, qin, h, pout, dt, T, NN) !задание параметров
+do i = 1, NN  ! начальное приближение
+    P0(i) = 0.0
+    W0(i) = 0.0
+    relax(i) = 0.01
+    relax(i+NN) = 0.01
+end do  
 
-!Метод Ньютона:
-call NewtonInit(P0, W0, NN) !начальное приближение
+A = ConvertMatrix(matrAp, NN) ! сначала конвертирую матрицу matrAp
+B = dFdxForNewton(A, matrPfromW, fluidParams%dt, NN) !Считаю матрицу производных для метода Ньютона
+call PrintMatrix(B,2*NN,2*NN) !Вывожу ее
+C = invertMatrix(B, 2*NN) !Ищу обратную к ней
+call PrintMatrix(C,2*NN, 2*NN) !Но он почему - то считает обратной единичную матрицу, то есть что-то не так с функцией InvertMatrix
+call PrintMultMatrix(B,C,2*NN) ! Вот их произведение, видно, что матрица получилась не единичной
 PRINT*,"Newton's method:"
-call NewtonStart(P0, W0, NN, dt, qin, mu, h, T, E, eps)
-
-!Метод релаксации:
-relax(1,1) = 0.001
-relax(1,2) = -0.001
-relax(2,1) = -0.001
-relax(2,2) = 0.001
-call RelaxInit(P1, W1, NN) !начальное приближение
+call NewtonMethod(P0, W0, NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW, xx, A)
 PRINT*,"Relaxation method :"
-call RelaxStart(P1, W1, NN, dt, qin, mu, h, T, E, eps, relax)
+call RelaxMethod(P0, W0, NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, relax, matrPfromW, xx, A)
 
 END PROGRAM demo
