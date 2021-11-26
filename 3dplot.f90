@@ -10,6 +10,7 @@ real(8), dimension(2*Nmax, 2*Nmax) :: B
 real(8), dimension(1:2*Nmax, 1:2*Nmax) :: C
 real(8), dimension(Nmax) :: P, W, Wn, P0, W0, P1, W1
 real(8), dimension(2*Nmax) :: relax  
+real(8) :: MatrTmp(1:2*Nmax, 1:2*Nmax)
 real(8) :: eps, pout, hh
 integer :: i
 integer :: NN           ! size of system of nonlinear equations
@@ -52,19 +53,22 @@ call makeFluidMatrixAndRHSRadial(xx,NN05,fluidParams,W,Wn,matrAp,RHS)
 eps = 0.001d0
 hh = xx(2)-xx(1) ! не нашла, где взять значение
 NN = Nmax
-do i = 1, NN  ! начальное приближение
-    P0(i) = 0.0d0
-    W0(i) = 0.0d0
-    relax(i) = 0.01d0
-    relax(i+NN) = 0.01d0
-end do  
+! начальное приближение
+P0(1:NN05) = 0.d0
+W0(1:NN05) = 0.d0
+relax(1:NN) = 0.01d0
 
 A = ConvertMatrix(matrAp, NN05) ! сначала конвертирую матрицу matrAp
 B = dFdxForNewton(A, matrPfromW, fluidParams%dt, NN05) !Считаю матрицу производных для метода Ньютона
-call PrintMatrix(B,2*NN05,2*NN05) !Вывожу ее
-C = invertMatrix(B, 2*NN05) !Ищу обратную к ней
-call PrintMatrix(C,2*NN05, 2*NN05) !Но он почему - то считает обратной единичную матрицу, то есть что-то не так с функцией InvertMatrix
-call PrintMultMatrix(B,C,2*NN05) ! Вот их произведение, видно, что матрица получилась не единичной
+call PrintMatrix(B,2*NN05,2*NN05)   !Вывожу ее
+C = invertMatrix(B, 2*NN05)         !Ищу обратную к ней
+call PrintMatrix(C,2*NN05, 2*NN05)  !Но он почему - то считает обратной единичную матрицу, то есть что-то не так с функцией InvertMatrix
+! не занулили матрицу B перед заполнением
+!call PrintMultMatrix(B,C,2*NN05) ! Вот их произведение, видно, что матрица получилась не единичной
+! В PrintMultMatrix две функции: 1) посчитать произведение, 2) вывести на экран. 2 - Вы уже написали, 1 - перемножение матриц, которое пригодится (но есть и стандартная функция)
+MatrTmp(1:NN,1:NN) = matmul(B(1:NN,1:NN),C(1:NN,1:NN))
+call PrintMatrix(MatrTmp,NN,NN) 
+
 PRINT*,"Newton's method:"
 call NewtonMethod(P0, W0, NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW, xx, A)
 PRINT*,"Relaxation method :"
