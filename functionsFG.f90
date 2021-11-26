@@ -75,6 +75,7 @@ real(8) :: dt
 real(8) :: matrPfromW(N,N), matrAp(N, N) 
 real(8), dimension(2*N,2*N) :: Aout
 integer:: i, j
+Aout = 0.d0
 do i = 1, 2*N
   do j = 1, 2*N
       if (i <= N) then
@@ -247,6 +248,7 @@ real(8), intent (IN) :: Pk(:), Wk(:)
 integer, intent (IN) :: NN
 real(8), dimension(NN,NN) :: Aout
 integer:: i, j
+Aout = 0.d0
 do i = 1, NN
   do j = 1, NN
       if((i==1).and.(j==1)) then 
