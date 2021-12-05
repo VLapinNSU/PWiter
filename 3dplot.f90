@@ -1,5 +1,5 @@
 ﻿PROGRAM demo
-use functionsFG                     ! функции удобно выновить в модули, тогда файл меньше
+use functionsFG                     ! функции удобно выносить в модули, тогда файл меньше
 use elasticRadial
 use fluidRadial
 implicit none                       ! это запрещает использование неописанных переменных 
