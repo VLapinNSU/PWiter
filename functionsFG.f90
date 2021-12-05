@@ -16,6 +16,7 @@ do i = 1, NN
     end do
     if(i==1) then
         func(1) = func(1) - qin / (2.d0*pi) / xx(1) / hh
+        !print*, qin / (2.d0*pi) / xx(1) / hh
     end if
 end do
 end function
@@ -37,36 +38,44 @@ end function
 subroutine RelaxMethod(P0, W0, N, dt, qin, pi, hh, eps, relax, matrPfromW, xx, matrAp)
 integer:: N, i
 real(8) :: hh, dt, qin, pi, eps, differenceP, differenceW
-real(8), dimension(2*N) :: relax !(1:N) - для F, (N+1:2N) - для G
-real(8), dimension(N) :: P0, W0, F, G, Pn, Wn, xx
-real(8) :: matrPfromW(N,N), matrAp(N, N)      
+real(8), dimension(N) :: relax !(1:N/2) - для F, (N/2+1:N) - для G
+real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx
+real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)        
 differenceP = 1.0
 differenceW = 1.0 
+matrApconvert(1: N/2,1: N/2) = ConvertMatrix(matrAp, N/2)
 do while(max(differenceP, differenceW) > eps)  
-        do i = 1, N
+        do i = 1, N/2
             Print*, P0(i)
         end do
-        do i = 1, N
+        do i = 1, N/2
             Print*, W0(i)
         end do
         Print*, '    '
-        F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrAp, N)
-        G = Gfunction(P0, W0, matrPfromW, N)
-        do i = 1, N
-            Pn(i) = P0(i) - relax(i)*F(i)
-            Wn(i) = W0(i) - relax(i+N)*G(i)
+        F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
+        G = Gfunction(P0, W0, matrPfromW, N/2)
+        do i = 1, N/2
+            Pn(i) = P0(i) - relax(i)*G(i)
+            Wn(i) = W0(i) - relax(i+N/2)*F(i)
         end do
         differenceP = 0.0
         differenceW = 0.0
-        do i = 1, N
+        do i = 1, N/2
             differenceP = max(differenceP, ABS(P0(i)-Pn(i)))
             differenceW = max(differenceW, ABS(W0(i)-Wn(i)))
         end do
-        do i = 1, N
+        do i = 1, N/2
           P0(i) = Pn(i)
           W0(i) = Wn(i)
         end do
-end do        
+end do   
+do i = 1, N/2
+            Print*, P0(i)
+        end do
+        do i = 1, N/2
+            Print*, W0(i)
+        end do
+        Print*, '    '
 end subroutine
 
 function dFdxForNewton(matrAp, matrPfromW, dt, N) result(Aout) 
@@ -75,11 +84,12 @@ real(8) :: dt
 real(8) :: matrPfromW(N,N), matrAp(N, N) 
 real(8), dimension(2*N,2*N) :: Aout
 integer:: i, j
+Aout = 0.d0
 do i = 1, 2*N
   do j = 1, 2*N
       if (i <= N) then
           if (j <= N) then
-                Aout(i,j) = matrAp(i,j)
+                Aout(i,j) = - matrAp(i,j)
           else
               Aout(i,j) = 1/dt
           end if    
@@ -95,45 +105,57 @@ end do
 end function
 
 subroutine NewtonMethod(P0, W0, N, dt, qin, pi, hh, eps, matrPfromW, xx, matrAp)
-integer:: N, i, j
+integer:: N, i, j, Iter
 real(8) :: hh, dt, pi, qin, eps, differenceP, differenceW
-real(8), dimension(N) :: P0, W0, F, G, Pn, Wn, xx
-real(8) :: matrPfromW(N,N), matrAp(N, N)  
-real(8), dimension(1:2*N, 1:2*N) :: Ainvert
-real(8), dimension(2*N, 2*N) :: A
+real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx
+real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)  
+real(8), dimension(1:N, 1:N) :: Ainvert
+real(8), dimension(N, N) :: A
 differenceP = 1.0
 differenceW = 1.0 
-do while(max(differenceP, differenceW) > eps)   
-    do i = 1, N
-        Print*, P0(i)
+matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
+!do while(max(differenceP, differenceW) > eps)   
+do Iter = 1, 10
+    do i = 1, N/2
+        Print*, P0(i), ' P0 '
     end do
-    do i = 1, N
-        Print*, W0(i)
+    do i = 1, N/2
+        Print*, W0(i), ' W0 '
     end do
     Print*, '    '
-    F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrAp, N)
-    G = Gfunction(P0, W0, matrPfromW, N)
-    A = dFdxForNewton(matrAp, matrPfromW, dt, N)
-    Ainvert = invertMatrix(A, 2*N)
-    do i = 1, N
+    F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
+    G = Gfunction(P0, W0, matrPfromW, N/2)
+    A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2)  ! Матрица получается не зависящей от P0 и W0, т.е. постоянной
+    Ainvert(1:N,1:N) = invertMatrix(A, N) ! Тоже постоянная матрица
+    !call PrintMatrix(A,N,N)
+    !call PrintMatrix(Ainvert,N,N)
+    !call PrintMultMatrix(A,Ainvert,N)
+    do i = 1, N/2
         Pn(i) = P0(i)
         Wn(i) = W0(i)
-        do j = 1, N
-            Pn(i) = Pn(i) - Ainvert(i,j)*F(j) - Ainvert(i,j+N)*G(j)
-            Wn(i) = Wn(i) - Ainvert(i+N,j)*F(j) - Ainvert(i+N,j+N)*G(j)
-      end do
+        do j = 1, N/2
+            Pn(i) = Pn(i) - Ainvert(i,j)*F(j) - Ainvert(i,j+N/2)*G(j)
+            Wn(i) = Wn(i) - Ainvert(i+N/2,j)*F(j) - Ainvert(i+N/2,j+N/2)*G(j)
+        end do
     end do
     differenceP = 0.0
     differenceW = 0.0
-    do i = 1, N
+    do i = 1, N/2
        differenceP = max(differenceP, ABS(P0(i)-Pn(i)))
        differenceW = max(differenceW, ABS(W0(i)-Wn(i)))
     end do
-    do i = 1, N
+    do i = 1, N/2
         P0(i) = Pn(i)
         W0(i) = Wn(i)
     end do
 end do
+do i = 1, N/2
+    Print*, P0(i), ' P0 '
+end do
+do i = 1, N/2
+    Print*, W0(i), ' W0 '
+end do
+Print*, '    '
 end subroutine
     
 function invertMatrix(Ain, NN) result(Aout) 
@@ -247,6 +269,7 @@ real(8), intent (IN) :: Pk(:), Wk(:)
 integer, intent (IN) :: NN
 real(8), dimension(NN,NN) :: Aout
 integer:: i, j
+Aout = 0.d0
 do i = 1, NN
   do j = 1, NN
       if((i==1).and.(j==1)) then 
@@ -394,4 +417,3 @@ close(48)
 end subroutine 
 
 end module 
- 
