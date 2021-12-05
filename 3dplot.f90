@@ -10,9 +10,11 @@ real(8), dimension(2*Nmax, 2*Nmax) :: B
 real(8), dimension(1:2*Nmax, 1:2*Nmax) :: C
 real(8), dimension(Nmax) :: P, W, Wn, P0, W0, P1, W1
 real(8), dimension(2*Nmax) :: relax  
+real(8) :: MatrTmp(1:2*Nmax, 1:2*Nmax)
 real(8) :: eps, pout, hh
 integer :: i
-integer :: NN          ! используемый размер массива не обязан совпадать с самим размером. Позволяет менять его без перекомпиляции программы
+integer :: NN           ! size of system of nonlinear equations
+integer :: NN05         ! size of subvectors w, and p
 ! параметры для новых функций
 real(8) :: ElasticCoef, Rfrac       ! elastic and mesh parameters    !TODO: make common subroutine for all parameters
 real(8) :: matrWfromP(Nmax,Nmax), matrPfromW(Nmax,Nmax)          ! matrix for w_k = T^s_k*p_s
@@ -21,7 +23,7 @@ real(8) :: matrAp(3,Nmax)           ! fluid matrix [3,1..NN] with boundary condi
 real(8) :: RHS(1,1:Nmax)              ! Right hand side [1,1..NN] with boundary conditions
 real(8) :: XX(1:Nmax)               ! mesh, cell boundaries [0;Rfrac], [0..NN]
 
-NN = Nmax/2 ! только для новых функций
+NN05 = Nmax/2 ! только для новых функций
 ! subroutines to check quality of fluid and elastic matrixes
 !call testElasticMatrixRadial()     
 !call testFluidMatrixRadial()    
@@ -30,15 +32,15 @@ ElasticCoef = 8.d0/3.14159265d0/20.d0*(1-0.25d0**2)
 Rfrac = 10.d0   
 call setFluidParamsForTest(fluidParams)         
 fluidParams%pout = 0.01d0   ;   fluidParams%mu = 1.d0/1.d6
-xx = (/ (i, i = 0, NN) /) * Rfrac/NN    ! build mesh
+xx = (/ (i, i = 0, NN05) /) * Rfrac/NN05 + (Rfrac/NN05)/2   ! build mesh
 Wn = 0.d0
 ! initial step, to make fluid matrix 
-call makeElasticMatrixRadial(xx,Rfrac,NN, matrWfromP)    
-matrPfromW = invertMatrix(matrWfromP(1:NN,1:NN), NN)  
+call makeElasticMatrixRadial(xx,Rfrac,NN05, matrWfromP)    
+matrPfromW = invertMatrix(matrWfromP(1:NN05,1:NN05), NN05)  
 pout = 0.01d0
 P = pout
-W(1:NN) = matmul(matrWfromP(1:NN,1:NN),P(1:NN))*ElasticCoef
-call makeFluidMatrixAndRHSRadial(xx,NN,fluidParams,W,Wn,matrAp,RHS)
+W(1:NN05) = matmul(matrWfromP(1:NN05,1:NN05),P(1:NN05))*ElasticCoef
+call makeFluidMatrixAndRHSRadial(xx,NN05,fluidParams,W,Wn,matrAp,RHS)
 !TODO: новые функции считаются как 
 !Ffunc(1) = W/dt - matrAp*P - fluidParams%qin / (2.d0*pi) / xx(1) / hh
 !Ffunc(остальные) = W/dt - matrAp*P 
@@ -48,25 +50,22 @@ call makeFluidMatrixAndRHSRadial(xx,NN,fluidParams,W,Wn,matrAp,RHS)
 ! для обобщения будет удобнее с matrPfromW, но можно начать с любого варианта
 ! matrPfromW, matrWfromP считаются один раз и записаны как обычные матрицы
 
-eps = 0.001
-hh = xx(2)-xx(1) ! не нашла, где взять значение
+eps = 0.0000000001d0
+hh = xx(2)-xx(1)
 NN = Nmax
-do i = 1, NN  ! начальное приближение
-    P0(i) = 0.0
-    W0(i) = 0.0
-    relax(i) = 0.01
-    relax(i+NN) = 0.01
-end do  
 
-A = ConvertMatrix(matrAp, NN) ! сначала конвертирую матрицу matrAp
-B = dFdxForNewton(A, matrPfromW, fluidParams%dt, NN) !Считаю матрицу производных для метода Ньютона
-call PrintMatrix(B,2*NN,2*NN) !Вывожу ее
-C = invertMatrix(B, 2*NN) !Ищу обратную к ней
-call PrintMatrix(C,2*NN, 2*NN) !Но он почему - то считает обратной единичную матрицу, то есть что-то не так с функцией InvertMatrix
-call PrintMultMatrix(B,C,2*NN) ! Вот их произведение, видно, что матрица получилась не единичной
+! начальное приближение
+P0(1:NN05) = 0.000001d0
+W0(1:NN05) = 0.000001d0
+relax(1:NN) = 0.01d0
 PRINT*,"Newton's method:"
-call NewtonMethod(P0, W0, NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW, xx, A)
+! Метод Ньютона расходится. Mожет, причина в том, что матрица, обратная к матрице производных, постоянная?
+call NewtonMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW(1:NN05,1:NN05), xx(1:NN05), matrAp(1:3,1:NN05))
 PRINT*,"Relaxation method :"
-call RelaxMethod(P0, W0, NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, relax, matrPfromW, xx, A)
+! начальное приближение
+P0(1:NN05) = 0.000001d0
+W0(1:NN05) = 0.000001d0
+! Метод релаксации сошелся! (при NN=4)
+call RelaxMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, relax(1:NN), matrPfromW(1:NN05,1:NN05), xx(1:NN05), matrAp(1:3,1:NN05))
 
 END PROGRAM demo
