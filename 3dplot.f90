@@ -1,7 +1,7 @@
 ﻿PROGRAM demo
 use functionsFG                     ! функции удобно выносить в модули, тогда файл меньше
 use elasticRadial
-use fluidRadial
+!use fluidRadial
 implicit none                       ! это запрещает использование неописанных переменных 
 integer, parameter :: Nmax = 4    ! позволяет менять размеры сразу у всех массивов
 ! real(8) - двойная точность. real - одинарная. обычно используют двойную
@@ -60,7 +60,7 @@ W0(1:NN05) = 0.000001d0
 relax(1:NN) = 0.01d0
 PRINT*,"Newton's method:"
 ! Метод Ньютона расходится. Mожет, причина в том, что матрица, обратная к матрице производных, постоянная?
-call NewtonMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW(1:NN05,1:NN05), xx(1:NN05), matrAp(1:3,1:NN05))
+call NewtonMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW(1:NN05,1:NN05), xx(1:NN05), matrAp(1:3,1:NN05), fluidParams)
 PRINT*,"Relaxation method :"
 ! начальное приближение
 P0(1:NN05) = 0.000001d0

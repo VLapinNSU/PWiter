@@ -1,4 +1,5 @@
 ﻿module functionsFG
+use fluidRadial
 implicit none 
 
 contains 
@@ -115,15 +116,23 @@ do i = 1, 2*N
 end do
 end function
 
-subroutine NewtonMethod(P0, W0, N, dt, qin, pi, hh, eps, matrPfromW, xx, matrAp)
+subroutine NewtonMethod(P0, W0, N, dt, qin, pi, hh, eps, matrPfromW, xx, matrAp, fluidParams)
+type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
 integer:: N, i, j, Iter
 real(8) :: hh, dt, pi, qin, eps, differenceP, differenceW
 real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx
 real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)  
 real(8), dimension(1:N, 1:N) :: Ainvert
 real(8), dimension(N, N) :: A
+real(8) :: WprevTimeStep(1:N/2)     ! width distribution at previous time step
+real(8) :: RHS(1,1:N/2)               ! right hand side of fluid equation. is not used here
+real(8) :: xBound(0:N/2)            ! coordinates of cell boundaries (not centr)
+
+xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = 0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
+
 differenceP = 1.0
 differenceW = 1.0 
+WprevTimeStep = 0.d0
 matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
 !do while(max(differenceP, differenceW) > eps)   
 do Iter = 1, 10
@@ -134,6 +143,7 @@ do Iter = 1, 10
         Print*, W0(i), ' W0 '
     end do
     Print*, '    '
+    call makeFluidMatrixAndRHSRadial(xBound,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
     F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
     G = Gfunction(P0, W0, matrPfromW, N/2)
     A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2)  ! Матрица получается не зависящей от P0 и W0, т.е. постоянной
