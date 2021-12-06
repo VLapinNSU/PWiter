@@ -135,6 +135,8 @@ differenceW = 1.0
 WprevTimeStep = 0.d0
 matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
 !do while(max(differenceP, differenceW) > eps)   
+open(10,file = 'NewtonHist.plt')
+write(10,'(A)') 'Variables = Iter, difP, difW'
 do Iter = 1, 10
     do i = 1, N/2
         Print*, P0(i), ' P0 '
@@ -169,7 +171,9 @@ do Iter = 1, 10
         P0(i) = Pn(i)
         W0(i) = Wn(i)
     end do
+    write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW
 end do
+close(10)
 do i = 1, N/2
     Print*, P0(i), ' P0 '
 end do
