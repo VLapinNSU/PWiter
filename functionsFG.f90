@@ -41,10 +41,15 @@ real(8) :: hh, dt, qin, pi, eps, differenceP, differenceW
 real(8), dimension(N) :: relax !(1:N/2) - для F, (N/2+1:N) - для G
 real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx
 real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)        
-differenceP = 1.0
-differenceW = 1.0 
-matrApconvert(1: N/2,1: N/2) = ConvertMatrix(matrAp, N/2)
-do while(max(differenceP, differenceW) > eps)  
+integer :: Iter
+    differenceP = 1.0
+    differenceW = 1.0 
+    matrApconvert(1: N/2,1: N/2) = ConvertMatrix(matrAp, N/2)
+    open(10,file = 'RelaxHist.plt')
+    write(10,'(A)') 'Variables = Iter, difP, difW'
+    Iter = 0
+    do while(max(differenceP, differenceW) > eps)  
+        Iter = Iter + 1
         do i = 1, N/2
             Print*, P0(i)
         end do
@@ -58,24 +63,30 @@ do while(max(differenceP, differenceW) > eps)
             Pn(i) = P0(i) - relax(i)*G(i)
             Wn(i) = W0(i) - relax(i+N/2)*F(i)
         end do
-        differenceP = 0.0
-        differenceW = 0.0
-        do i = 1, N/2
-            differenceP = max(differenceP, ABS(P0(i)-Pn(i)))
-            differenceW = max(differenceW, ABS(W0(i)-Wn(i)))
-        end do
-        do i = 1, N/2
-          P0(i) = Pn(i)
-          W0(i) = Wn(i)
-        end do
-end do   
-do i = 1, N/2
-            Print*, P0(i)
-        end do
-        do i = 1, N/2
-            Print*, W0(i)
-        end do
-        Print*, '    '
+        !differenceP = 0.0      ! короче и нагляднее
+        !differenceW = 0.0
+        !do i = 1, N/2      
+        !    differenceP = max(differenceP, ABS(P0(i)-Pn(i)))
+        !    differenceW = max(differenceW, ABS(W0(i)-Wn(i)))
+        !end do
+        !do i = 1, N/2
+        !  P0(i) = Pn(i)
+        !  W0(i) = Wn(i)
+        !end do
+        differenceP = maxval( ABS(P0(1:N/2)-Pn(1:N/2)) )    
+        differenceW = maxval( ABS(W0(1:N/2)-Wn(1:N/2)) )
+        P0(1:N/2) = Pn(1:N/2)
+        W0(1:N/2) = Wn(1:N/2)
+        write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW
+    end do   
+    close(10)
+    do i = 1, N/2
+        Print*, P0(i)
+    end do
+    do i = 1, N/2
+        Print*, W0(i)
+    end do
+    Print*, '    '
 end subroutine
 
 function dFdxForNewton(matrAp, matrPfromW, dt, N) result(Aout) 
