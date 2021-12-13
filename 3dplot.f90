@@ -19,7 +19,7 @@ integer :: NN05         ! size of subvectors w, and p
 real(8) :: ElasticCoef, Rfrac       ! elastic and mesh parameters    !TODO: make common subroutine for all parameters
 real(8) :: matrWfromP(Nmax,Nmax), matrPfromW(Nmax,Nmax)          ! matrix for w_k = T^s_k*p_s
 type(TfluidParams) :: fluidParams   ! parameters for fluid
-real(8) :: matrAp(3,Nmax)           ! fluid matrix [3,1..NN] with boundary conditions
+real(8) :: matrAp(3,Nmax), matrAp2(3,Nmax)       ! fluid matrix [3,1..NN] with boundary conditions
 real(8) :: RHS(1,1:Nmax)              ! Right hand side [1,1..NN] with boundary conditions
 real(8) :: XX(1:Nmax)               ! mesh, cell boundaries [0;Rfrac], [0..NN]
 
@@ -41,7 +41,7 @@ pout = 0.01d0
 P = pout
 W(1:NN05) = matmul(matrWfromP(1:NN05,1:NN05),P(1:NN05))*ElasticCoef
 call makeFluidMatrixAndRHSRadial(xx,NN05,fluidParams,W,Wn,matrAp,RHS)
-!TODO: новые функции считаются как 
+!TODO: новые функции считаются как
 !Ffunc(1) = W/dt - matrAp*P - fluidParams%qin / (2.d0*pi) / xx(1) / hh
 !Ffunc(остальные) = W/dt - matrAp*P 
 ! матрица matrAp записана как трёхдиагональная, надо конвертировать 
@@ -50,22 +50,26 @@ call makeFluidMatrixAndRHSRadial(xx,NN05,fluidParams,W,Wn,matrAp,RHS)
 ! для обобщения будет удобнее с matrPfromW, но можно начать с любого варианта
 ! matrPfromW, matrWfromP считаются один раз и записаны как обычные матрицы
 
-eps = 0.0000000001d0
+eps = 0.00000000001d0
 hh = xx(2)-xx(1)
 NN = Nmax
 
 ! начальное приближение
-P0(1:NN05) = 0.000001d0
-W0(1:NN05) = 0.000001d0
-relax(1:NN) = 0.01d0
+!P0(1:NN05) = 0.000001d0
+!W0(1:NN05) = 0.000001d0
+P0(1) = 0.000001d0
+P0(2) = 0.000001d0
+W0(1) = 0.000001d0
+W0(2) = 0.000001d0
 PRINT*,"Newton's method:"
-! Метод Ньютона расходится. Mожет, причина в том, что матрица, обратная к матрице производных, постоянная?
+matrAp2(1:3,1:NN) = matrAp(1:3,1:NN)  ! matrAp после метода Ньютона возвращается видоизмененной, поэтому запоминаю ее первоначальный вид в matrAp2
 call NewtonMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW(1:NN05,1:NN05), xx(1:NN05), matrAp(1:3,1:NN05), fluidParams)
 PRINT*,"Relaxation method :"
 ! начальное приближение
 P0(1:NN05) = 0.000001d0
 W0(1:NN05) = 0.000001d0
+relax(1:NN) = 0.1d0
 ! Метод релаксации сошелся! (при NN=4)
-call RelaxMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, relax(1:NN), matrPfromW(1:NN05,1:NN05), xx(1:NN05), matrAp(1:3,1:NN05))
+call RelaxMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, relax(1:NN), matrPfromW(1:NN05,1:NN05), xx(1:NN05), matrAp2(1:3,1:NN05), fluidParams)
 
 END PROGRAM demo

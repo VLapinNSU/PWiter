@@ -17,7 +17,6 @@ do i = 1, NN
     end do
     if(i==1) then
         func(1) = func(1) - qin / (2.d0*pi) / xx(1) / hh
-        !print*, qin / (2.d0*pi) / xx(1) / hh
     end if
 end do
 end function
@@ -36,51 +35,28 @@ do i = 1, NN
 end do
 end function
 
-subroutine RelaxMethod(P0, W0, N, dt, qin, pi, hh, eps, relax, matrPfromW, xx, matrAp)
-integer:: N, i
+subroutine RelaxMethod(P0, W0, N, dt, qin, pi, hh, eps, relax, matrPfromW, xx, matrAp, fluidParams)
+type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
+integer:: N, i, k
 real(8) :: hh, dt, qin, pi, eps, differenceP, differenceW
 real(8), dimension(N) :: relax !(1:N/2) - для F, (N/2+1:N) - для G
 real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx
 real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)        
 integer :: Iter
-    differenceP = 1.0
-    differenceW = 1.0 
-    matrApconvert(1: N/2,1: N/2) = ConvertMatrix(matrAp, N/2)
-    open(10,file = 'RelaxHist.plt')
-    write(10,'(A)') 'Variables = Iter, difP, difW'
-    Iter = 0
-    do while(max(differenceP, differenceW) > eps)  
-        Iter = Iter + 1
-        do i = 1, N/2
-            Print*, P0(i)
-        end do
-        do i = 1, N/2
-            Print*, W0(i)
-        end do
-        Print*, '    '
-        F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
-        G = Gfunction(P0, W0, matrPfromW, N/2)
-        do i = 1, N/2
-            Pn(i) = P0(i) - relax(i)*G(i)
-            Wn(i) = W0(i) - relax(i+N/2)*F(i)
-        end do
-        !differenceP = 0.0      ! короче и нагляднее
-        !differenceW = 0.0
-        !do i = 1, N/2      
-        !    differenceP = max(differenceP, ABS(P0(i)-Pn(i)))
-        !    differenceW = max(differenceW, ABS(W0(i)-Wn(i)))
-        !end do
-        !do i = 1, N/2
-        !  P0(i) = Pn(i)
-        !  W0(i) = Wn(i)
-        !end do
-        differenceP = maxval( ABS(P0(1:N/2)-Pn(1:N/2)) )    
-        differenceW = maxval( ABS(W0(1:N/2)-Wn(1:N/2)) )
-        P0(1:N/2) = Pn(1:N/2)
-        W0(1:N/2) = Wn(1:N/2)
-        write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW
-    end do   
-    close(10)
+real(8) :: WprevTimeStep(1:N/2)     ! width distribution at previous time step
+real(8) :: RHS(1,1:N/2)               ! right hand side of fluid equation. is not used here
+real(8) :: xBound(0:N/2)            ! coordinates of cell boundaries (not centr)
+
+xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = xx(1)-0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
+differenceP = 1.0
+differenceW = 1.0 
+WprevTimeStep = 0.d0
+open(10,file = 'RelaxHist.plt')
+!write(10,'(A)') 'Variables = Iter, difP, difW'
+Iter = 0
+!do k = 1, 10
+do while(max(differenceP, differenceW) > eps)  
+    Iter = Iter + 1
     do i = 1, N/2
         Print*, P0(i)
     end do
@@ -88,22 +64,55 @@ integer :: Iter
         Print*, W0(i)
     end do
     Print*, '    '
+    call makeFluidMatrixAndRHSRadial(xBound,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
+    matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
+    !call PrintMatrix(matrApconvert, N/2, N/2)
+    F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
+    G = Gfunction(P0, W0, matrPfromW, N/2)
+    do i = 1, N/2
+        Pn(i) = P0(i) - relax(i)*G(i)
+        Wn(i) = W0(i) - relax(i+N/2)*F(i)
+    end do
+    differenceP = maxval( ABS(P0(1:N/2)-Pn(1:N/2)) )    
+    differenceW = maxval( ABS(W0(1:N/2)-Wn(1:N/2)) )
+    P0(1:N/2) = Pn(1:N/2)
+    W0(1:N/2) = Wn(1:N/2)
+    write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW
+end do   
+close(10)
+do i = 1, N/2
+    Print*, P0(i)
+end do
+do i = 1, N/2
+    Print*, W0(i)
+end do
+Print*, '    '
 end subroutine
 
-function dFdxForNewton(matrAp, matrPfromW, dt, N) result(Aout) 
+function dFdxForNewton(matrAp, matrPfromW, dt, N, xBound, fluidParams, P, W, hh) result(Aout) 
+type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
 integer, intent (IN) :: N
-real(8) :: dt
+real(8) :: dt, hh
 real(8) :: matrPfromW(N,N), matrAp(N, N) 
 real(8), dimension(2*N,2*N) :: Aout
+real(8) :: xBound(0:N)   !N=2
+real(8), dimension(N) :: P, W
 integer:: i, j
 Aout = 0.d0
+Aout(1, N+1) = ( (0.5*3*W(1)**2) / (12*fluidParams%mu*hh**2) ) * (P(1)-P(2))
+Aout(1, N+2) = ( (0.5*3*xBound(2)*W(2)**2) / (12*fluidParams%mu*hh**2*xBound(1)) ) * (P(1)-P(2))
 do i = 1, 2*N
+    !if ((i>1).and.(i<N)) then   ! общий случай
+    !    Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
+    !    Aout(i, N+i+1) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
+    !    Aout(i, N+i) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
+    !end if
   do j = 1, 2*N
       if (i <= N) then
           if (j <= N) then
-                Aout(i,j) = - matrAp(i,j)
+              Aout(i,j) = - matrAp(i,j)
           else
-              Aout(i,j) = 1/dt
+              Aout(i,j) = Aout(i,j) + 1/dt
           end if    
       else
           if (j <= N) then
@@ -128,16 +137,14 @@ real(8) :: WprevTimeStep(1:N/2)     ! width distribution at previous time step
 real(8) :: RHS(1,1:N/2)               ! right hand side of fluid equation. is not used here
 real(8) :: xBound(0:N/2)            ! coordinates of cell boundaries (not centr)
 
-xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = 0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
-
+xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = xx(1)-0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
 differenceP = 1.0
 differenceW = 1.0 
 WprevTimeStep = 0.d0
-matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
-!do while(max(differenceP, differenceW) > eps)   
 open(10,file = 'NewtonHist.plt')
 write(10,'(A)') 'Variables = Iter, difP, difW'
-do Iter = 1, 10
+!do while(max(differenceP, differenceW) > eps)   
+do Iter = 1, 20
     do i = 1, N/2
         Print*, P0(i), ' P0 '
     end do
@@ -146,31 +153,27 @@ do Iter = 1, 10
     end do
     Print*, '    '
     call makeFluidMatrixAndRHSRadial(xBound,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
+    matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
+    !call PrintMatrix(matrApconvert,N/2,N/2)
     F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
     G = Gfunction(P0, W0, matrPfromW, N/2)
-    A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2)  ! Матрица получается не зависящей от P0 и W0, т.е. постоянной
-    Ainvert(1:N,1:N) = invertMatrix(A, N) ! Тоже постоянная матрица
-    !call PrintMatrix(A,N,N)
+    A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xBound, fluidParams, P0, W0, hh) ! N = 4
+    Ainvert(1:N,1:N) = invertMatrix(A, N)
+    call PrintMatrix(A,N,N)
     !call PrintMatrix(Ainvert,N,N)
     !call PrintMultMatrix(A,Ainvert,N)
     do i = 1, N/2
         Pn(i) = P0(i)
         Wn(i) = W0(i)
         do j = 1, N/2
-            Pn(i) = Pn(i) - Ainvert(i,j)*F(j) - Ainvert(i,j+N/2)*G(j)
-            Wn(i) = Wn(i) - Ainvert(i+N/2,j)*F(j) - Ainvert(i+N/2,j+N/2)*G(j)
+            Pn(i) = Pn(i) - (Ainvert(i,j)*F(j) + Ainvert(i,j+N/2)*G(j))
+            Wn(i) = Wn(i) - (Ainvert(i+N/2,j)*F(j) + Ainvert(i+N/2,j+N/2)*G(j))
         end do
     end do
-    differenceP = 0.0
-    differenceW = 0.0
-    do i = 1, N/2
-       differenceP = max(differenceP, ABS(P0(i)-Pn(i)))
-       differenceW = max(differenceW, ABS(W0(i)-Wn(i)))
-    end do
-    do i = 1, N/2
-        P0(i) = Pn(i)
-        W0(i) = Wn(i)
-    end do
+    differenceP = maxval( ABS(P0(1:N/2)-Pn(1:N/2)) )    
+    differenceW = maxval( ABS(W0(1:N/2)-Wn(1:N/2)) )
+    P0(1:N/2) = Pn(1:N/2)
+    W0(1:N/2) = Wn(1:N/2)
     write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW
 end do
 close(10)
