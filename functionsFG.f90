@@ -54,7 +54,6 @@ WprevTimeStep = 0.d0
 open(10,file = 'RelaxHist.plt')
 !write(10,'(A)') 'Variables = Iter, difP, difW'
 Iter = 0
-!do k = 1, 10
 do while(max(differenceP, differenceW) > eps)  
     Iter = Iter + 1
     do i = 1, N/2
@@ -112,11 +111,15 @@ do i = 1, 2*N
           if (j <= N) then
               Aout(i,j) = - matrAp(i,j)
           else
-              Aout(i,j) = Aout(i,j) + 1/dt
+              if (i == j-N) then
+                Aout(i,j) = Aout(i,j) + 1/dt
+              end if
           end if    
       else
           if (j <= N) then
-              Aout(i,j) = 1 
+              if (i-N == j) then
+                Aout(i,j) = 1
+              end if 
           else
                 Aout(i,j) = - matrPfromW(i-N,j-N)
           end if  
@@ -142,9 +145,10 @@ differenceP = 1.0
 differenceW = 1.0 
 WprevTimeStep = 0.d0
 open(10,file = 'NewtonHist.plt')
-write(10,'(A)') 'Variables = Iter, difP, difW'
-!do while(max(differenceP, differenceW) > eps)   
-do Iter = 1, 20
+!write(10,'(A)') 'Variables = Iter, difP, difW'
+Iter = 0
+do while(max(differenceP, differenceW) > eps)  
+    Iter = Iter + 1
     do i = 1, N/2
         Print*, P0(i), ' P0 '
     end do
@@ -154,12 +158,11 @@ do Iter = 1, 20
     Print*, '    '
     call makeFluidMatrixAndRHSRadial(xBound,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
     matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
-    !call PrintMatrix(matrApconvert,N/2,N/2)
     F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
     G = Gfunction(P0, W0, matrPfromW, N/2)
     A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xBound, fluidParams, P0, W0, hh) ! N = 4
     Ainvert(1:N,1:N) = invertMatrix(A, N)
-    call PrintMatrix(A,N,N)
+    !call PrintMatrix(A,N,N)
     !call PrintMatrix(Ainvert,N,N)
     !call PrintMultMatrix(A,Ainvert,N)
     do i = 1, N/2
