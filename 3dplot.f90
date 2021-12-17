@@ -3,7 +3,7 @@ use functionsFG                     ! функции удобно выносит
 use elasticRadial
 !use fluidRadial
 implicit none                       ! это запрещает использование неописанных переменных 
-integer, parameter :: Nmax = 4    ! позволяет менять размеры сразу у всех массивов
+integer, parameter :: Nmax = 8    ! позволяет менять размеры сразу у всех массивов
 ! real(8) - двойная точность. real - одинарная. обычно используют двойную
 real(8), dimension(Nmax,Nmax) :: F, G, A
 real(8), dimension(2*Nmax, 2*Nmax) :: B
@@ -55,12 +55,8 @@ hh = xx(2)-xx(1)
 NN = Nmax
 
 ! начальное приближение
-!P0(1:NN05) = 0.000001d0
-!W0(1:NN05) = 0.000001d0
-P0(1) = 0.000001d0
-P0(2) = 0.000001d0
-W0(1) = 0.000001d0
-W0(2) = 0.000001d0
+P0(1:NN05) = 0.000001d0
+W0(1:NN05) = 0.000001d0
 PRINT*,"Newton's method:"
 matrAp2(1:3,1:NN) = matrAp(1:3,1:NN)  ! matrAp после метода Ньютона возвращается видоизмененной, поэтому запоминаю ее первоначальный вид в matrAp2
 call NewtonMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW(1:NN05,1:NN05), xx(1:NN05), matrAp(1:3,1:NN05), fluidParams)
@@ -71,5 +67,5 @@ W0(1:NN05) = 0.000001d0
 relax(1:NN) = 0.1d0
 ! Метод релаксации сошелся! (при NN=4)
 call RelaxMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, relax(1:NN), matrPfromW(1:NN05,1:NN05), xx(1:NN05), matrAp2(1:3,1:NN05), fluidParams)
-
+! Оба метода сошлись к почти одинаковому решению (компоненты w3 отличаются, остальные совпадают). Очевидно, что в точном решении w4=p4 из вида системы. Оба метода получили решение, где w4=p4, как и должно быть. 
 END PROGRAM demo

@@ -101,11 +101,11 @@ Aout = 0.d0
 Aout(1, N+1) = ( (0.5*3*W(1)**2) / (12*fluidParams%mu*hh**2) ) * (P(1)-P(2))
 Aout(1, N+2) = ( (0.5*3*xBound(2)*W(2)**2) / (12*fluidParams%mu*hh**2*xBound(1)) ) * (P(1)-P(2))
 do i = 1, 2*N
-    !if ((i>1).and.(i<N)) then   ! общий случай
-    !    Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
-    !    Aout(i, N+i+1) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
-    !    Aout(i, N+i) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
-    !end if
+    if ((i>1).and.(i<N)) then   ! общий случай
+        Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
+        Aout(i, N+i) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
+        Aout(i, N+i+1) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
+    end if
   do j = 1, 2*N
       if (i <= N) then
           if (j <= N) then
@@ -160,8 +160,9 @@ do while(max(differenceP, differenceW) > eps)
     matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
     F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
     G = Gfunction(P0, W0, matrPfromW, N/2)
-    A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xBound, fluidParams, P0, W0, hh) ! N = 4
+    A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xBound, fluidParams, P0, W0, hh)
     Ainvert(1:N,1:N) = invertMatrix(A, N)
+    !call PrintMatrix(matrPfromW,N/2,N/2)
     !call PrintMatrix(A,N,N)
     !call PrintMatrix(Ainvert,N,N)
     !call PrintMultMatrix(A,Ainvert,N)
