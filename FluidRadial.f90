@@ -80,7 +80,7 @@ end subroutine testFluidMatrixRadial
 ! TODO for Lapin: implement others types of boundary conditions
 ! TODO for Lapin: only 1-st order of convergence is observed - fix approximation
 subroutine makeFluidMatrixAndRHSRadial(xx,NN,fluidParams,width,widthN, matrAp,RHS)
-real(8), intent(IN ) :: xx(0:)                           ! mesh, cell boundaries [0;Rfrac], [0..NN]
+real(8), intent(IN ) :: xx(:)                          ! mesh, cell centers [1..NN]
 real(8), intent(IN ) :: width(:), widthN(:)             ! width at current and previous steps [1..NN]
 integer, intent(IN ) :: NN                              ! mesh size
 type(TfluidParams), intent(IN ) :: fluidParams          ! paranmeters
@@ -90,7 +90,7 @@ integer :: i
 real(8) :: rp, rm, wp, wm, wm3r, wp3r, hh                           ! r_{i+-1}, w_{i+-1}, hh=dx
 
     ! equation approximation
-    hh = xx(1)-xx(0)
+    hh = xx(2)-xx(1)
     matrAp = 0.d0   ;   rhs = 0.d0
     do i = 1, NN    
         !if (i> 1) then  ;   wm = 0.5d0*(width(i-1)+width(i))    ;   rm = 0.5d0*(xx(i-1)+xx(i))  ;   endif
@@ -104,7 +104,7 @@ real(8) :: rp, rm, wp, wm, wm3r, wp3r, hh                           ! r_{i+-1}, 
         matrAp(2,i) = - (matrAp(3,i)+matrAp(1,i))
         RHS(1,i) = (width(i)-widthN(i))/fluidParams%dt
     enddo
-    ! inflow boundary
+    ! inflow boundary ! 
     RHS(1,1) = RHS(1,1) - fluidParams%qin / (2.d0*pi) / xx(1) / hh      ! аппроксимация потока в i+1/2 уже есть
     ! outflow boundary
     RHS(1,NN) = fluidParams%pout
