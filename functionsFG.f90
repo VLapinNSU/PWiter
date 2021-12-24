@@ -10,15 +10,16 @@ integer:: i, j, NN
 real(8) :: hh, dt, qin, pi
 real(8), dimension(NN) :: P, W, func, xx
 real(8) :: matrAp(NN,NN)   
-do i = 1, NN
-    func(i) = W(i)/dt
-    do j = 1, NN
-        func(i) = func(i) - matrAp(i,j)*P(j)
+
+    func(1) = func(1) - qin / (2.d0*pi) / xx(1) / hh
+    do i = 2, NN-1
+        func(i) = W(i)/dt
+        do j = 1, NN
+            func(i) = func(i) - matrAp(i,j)*P(j)
+        end do
     end do
-    if(i==1) then
-        func(1) = func(1) - qin / (2.d0*pi) / xx(1) / hh
-    end if
-end do
+    func(NN) = P(NN) - 0.d0         ! TODO: добавить параметр p_out. Уравнение должно быть P-p_out = 0
+    
 end function
     
 function Gfunction(P, W, matrPfromW, NN) result(func)
@@ -100,32 +101,61 @@ integer:: i, j
 Aout = 0.d0
 Aout(1, N+1) = ( (0.5*3*W(1)**2) / (12*fluidParams%mu*hh**2) ) * (P(1)-P(2))
 Aout(1, N+2) = ( (0.5*3*xBound(2)*W(2)**2) / (12*fluidParams%mu*hh**2*xBound(1)) ) * (P(1)-P(2))
-do i = 1, 2*N
-    if ((i>1).and.(i<N)) then   ! общий случай
-        Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
-        Aout(i, N+i) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
-        Aout(i, N+i+1) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
-    end if
-  do j = 1, 2*N
-      if (i <= N) then
-          if (j <= N) then
-              Aout(i,j) = - matrAp(i,j)
-          else
-              if (i == j-N) then
-                Aout(i,j) = Aout(i,j) + 1/dt
-              end if
-          end if    
-      else
-          if (j <= N) then
-              if (i-N == j) then
-                Aout(i,j) = 1
-              end if 
-          else
-                Aout(i,j) = - matrPfromW(i-N,j-N)
-          end if  
-      end if    
-  end do
-end do
+!сложная нумерация. Заполнил матрицу по четвертям
+!(dF/dp)(dF/dw)
+!(dG/dp)(dG/dw)
+
+!(dF/dw)
+do i = 2, N-1
+    Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
+    Aout(i, N+i) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
+    Aout(i, N+i+1) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
+    Aout(i, N+i) = Aout(i,i) + 1/dt
+enddo
+Aout(1,N+1) = Aout(1,1) + 1/dt
+Aout(N,N+N) = Aout(1,1) + 1/dt          ! для N не надо, последнее уравнение p - p_out = 0
+!(dF/dp)
+do i = 1, N
+    do j = 1, N
+        Aout(i,j) = - matrAp(i,j)
+    enddo
+enddo
+!(dG/dp)
+do j = 1, N
+    Aout(j+N,j) = 1
+enddo
+!(dG/dw)
+do j = 1, N
+do i = 1, N
+    Aout(i+N,j+N) = - matrPfromW(i,j)
+enddo
+enddo
+!do i = 1, 2*N
+!    if ((i>1).and.(i<N)) then   ! общий случай  
+!        Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
+!        Aout(i, N+i) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
+!        Aout(i, N+i+1) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
+!    end if
+!    do j = 1, 2*N
+!        if (i <= N) then
+!            if (j <= N) then
+!                Aout(i,j) = - matrAp(i,j)
+!            else
+!                if (i == j-N) then
+!                    Aout(i,j) = Aout(i,j) + 1/dt
+!                end if
+!            end if    
+!        else
+!            if (j <= N) then
+!                if (i-N == j) then
+!                    Aout(i,j) = 1
+!                end if 
+!            else
+!                Aout(i,j) = - matrPfromW(i-N,j-N)
+!            end if  
+!        end if    
+!    end do
+!end do
 end function
 
 subroutine NewtonMethod(P0, W0, N, dt, qin, pi, hh, eps, matrPfromW, xx, matrAp, fluidParams)
@@ -448,4 +478,20 @@ end do
 close(48)
 end subroutine 
 
+
+! вывод в файл график одномерной функции 
+subroutine Grafik1D(X,Func,NN,filename)       
+implicit none 
+real(8), intent (IN) :: Func(:)                ! процедуре не обязательно знать максимальный размер, но используемый размер нужен
+real(8), intent (IN) :: X(:)
+integer, intent (IN) :: NN
+character(*), intent (IN) :: filename 
+integer :: i
+open(unit=48,file=filename)
+write(48, '(A)') 'Variables = X, F'                      ! не знаю, как оформить аналог для gnuplot 
+do i = 1, NN
+    write (48,'(2(E14.6))') X(i), Func(i)
+end do
+close(48)
+end subroutine 
 end module 

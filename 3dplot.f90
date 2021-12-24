@@ -3,7 +3,7 @@ use functionsFG                     ! функции удобно выносит
 use elasticRadial
 !use fluidRadial
 implicit none                       ! это запрещает использование неописанных переменных 
-integer, parameter :: Nmax = 4    ! позволяет менять размеры сразу у всех массивов
+integer, parameter :: Nmax = 8    ! позволяет менять размеры сразу у всех массивов
 ! real(8) - двойная точность. real - одинарная. обычно используют двойную
 real(8), dimension(Nmax/2) :: P, W, Wn, P0, W0, P1, W1
 real(8), dimension(Nmax) :: relax  
@@ -43,13 +43,14 @@ call makeFluidMatrixAndRHSRadial(Xcentr,NN05,fluidParams,W,Wn,matrAp,RHS)
 !TODO: новые функции считаются как
 !Ffunc(1) = W/dt - matrAp*P - fluidParams%qin / (2.d0*pi) / Xcentr(1) / hh
 !Ffunc(остальные) = W/dt - matrAp*P 
+!Ffunc(N) = matrAp*P - 
 ! матрица matrAp записана как трёхдиагональная, надо конвертировать 
 ! Ax=b => matrAp(1,i)*x(i-1)+matrAp(2,i)*x(i)+matrAp(3,i)*x(i+1) = b(i)
 ! Gfunc = W - matrWfromP * P или Gfunc = P - matrPfromW * W
 ! для обобщения будет удобнее с matrPfromW, но можно начать с любого варианта
 ! matrPfromW, matrWfromP считаются один раз и записаны как обычные матрицы
 
-eps = 1d-11
+eps = 1.d-5
 hh = Xcentr(2)-Xcentr(1)
 
 ! начальное приближение
@@ -58,6 +59,8 @@ W0(1:NN05) = 0.000001d0
 PRINT*,"Newton's method:"
 matrAp2(1:3,1:NN05) = matrAp(1:3,1:NN05)  ! matrAp после метода Ньютона возвращается видоизмененной, поэтому запоминаю ее первоначальный вид в matrAp2
 call NewtonMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp(1:3,1:NN05), fluidParams)
+call Grafik1D(Xcentr,P0,NN05,'NewtonP.plt')
+call Grafik1D(Xcentr,W0,NN05,'NewtonW.plt')
 
 PRINT*,"Relaxation method :"
 ! начальное приближение
@@ -66,6 +69,8 @@ W0(1:NN05) = 0.000001d0
 relax(1:NN) = 0.1d0
 ! Метод релаксации сошелся! (при NN=4)
 call RelaxMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, relax(1:NN), matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp2(1:3,1:NN05), fluidParams)
+call Grafik1D(Xcentr,P0,NN05,'RelaxP.plt')
+call Grafik1D(Xcentr,W0,NN05,'RelaxW.plt')
 ! Оба метода сошлись к почти одинаковому решению (компоненты w3 отличаются, остальные совпадают). Очевидно, что в точном решении w4=p4 из вида системы. Оба метода получили решение, где w4=p4, как и должно быть. 
 
     
