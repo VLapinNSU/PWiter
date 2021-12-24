@@ -11,14 +11,14 @@ real(8) :: hh, dt, qin, pi
 real(8), dimension(NN) :: P, W, func, xx
 real(8) :: matrAp(NN,NN)   
 
-    do i = 1, NN-1
-        func(i) = W(i)/dt
+    do i = 1, NN
+        func(i) = W(i)/dt       
+        if (i==NN) func(i) = 0.d0       ! the last equation is P-p_out=0, no dW/dt, matrAp(NN,NN)=-1
         do j = 1, NN
             func(i) = func(i) - matrAp(i,j)*P(j)
         end do
     end do
     func(1) = func(1) - qin / (2.d0*pi) / xx(1) / hh
-    !func(NN) =-P(NN) - 0.d0         ! TODO: добавить параметр p_out. Уравнение должно быть P-p_out = 0     ! uncomment for  -p+p_out
     
 end function
     
@@ -64,7 +64,7 @@ do while(max(differenceP, differenceW) > eps)
         Print*, W0(i)
     end do
     Print*, '    '
-    call makeFluidMatrixAndRHSRadial(xBound,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
+    call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
     matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
     !call PrintMatrix(matrApconvert, N/2, N/2)
     F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
@@ -89,13 +89,13 @@ end do
 Print*, '    '
 end subroutine
 
-function dFdxForNewton(matrAp, matrPfromW, dt, N, xBound, fluidParams, P, W, hh) result(Aout) 
+function dFdxForNewton(matrAp, matrPfromW, dt, N, xx, fluidParams, P, W, hh) result(Aout) 
 type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
 integer, intent (IN) :: N
 real(8) :: dt, hh
 real(8) :: matrPfromW(N,N), matrAp(N, N) 
 real(8), dimension(2*N,2*N) :: Aout
-real(8) :: xBound(0:N)   !N=2
+real(8) :: xx(1:N)          ! in makeFluidMatrixAndRHSRadial cell centres are used
 real(8), dimension(N) :: P, W
 integer:: i, j
 Aout = 0.d0
@@ -103,26 +103,29 @@ Aout = 0.d0
 !(dF/dp)(dF/dw)
 !(dG/dp)(dG/dw)
 
-!(dF/dw)
-Aout(1, N+1) = ( (0.5*3*W(1)**2) / (12*fluidParams%mu*hh**2) ) * (P(1)-P(2))
-Aout(1, N+2) = ( (0.5*3*xBound(2)*W(2)**2) / (12*fluidParams%mu*hh**2*xBound(1)) ) * (P(1)-P(2))
-Aout(1,N+1) = Aout(1,1) + 1/dt
-do i = 2, N-1
-    Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
-    Aout(i, N+i) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
-    Aout(i, N+i+1) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
-    Aout(i, N+i) = Aout(i,i) + 1/dt
-enddo
-Aout(N,N+N) = Aout(1,1) + 1/dt          ! для N не надо, последнее уравнение p - p_out = 0
 !(dF/dp)
 do i = 1, N
     do j = 1, N
         Aout(i,j) = - matrAp(i,j)
     enddo
 enddo
+!Aout(N,N) = 1.d0                            ! last F equation is p-p_out = 0 => dF/dp =1
+!(dF/dw)
+!Aout(1, N+1) = ( (0.5*3*W(1)**2) / (12*fluidParams%mu*hh**2) ) * (P(1)-P(2))
+!Aout(1, N+2) = ( (0.5*3*xx(2)*W(2)**2) / (12*fluidParams%mu*hh**2*xx(1)) ) * (P(1)-P(2))
+Aout(1, N+1) = ( (0.5d0*3.d0*xx(1  )*W(1  )**2) / (12.d0*fluidParams%mu*hh**2*xx(1)) ) * (P(1)-P(2)) 
+Aout(1, N+2) = ( (0.5d0*3.d0*xx(2  )*W(2  )**2) / (12.d0*fluidParams%mu*hh**2*xx(1)) ) * (P(1)-P(2))
+Aout(1, N+1) = Aout(1,N+1) + 1.d0/dt
+do i = 2, N-1
+    Aout(i, N+i-1) = ( (0.5d0*3.d0*xx(i-1)*W(i-1)**2) / (12.d0*fluidParams%mu*hh**2*xx(i)) ) * (P(i)-P(i-1))
+    Aout(i, N+i+1) = ( (0.5d0*3.d0*xx(i+1)*W(i+1)**2) / (12.d0*fluidParams%mu*hh**2*xx(i)) ) * (P(i)-P(i+1))
+    Aout(i, N+i  ) = ( (0.5d0*3.d0*xx(i  )*W(i  )**2) / (12.d0*fluidParams%mu*hh**2*xx(i)) ) * (2.d0*P(i)-P(i-1)-P(i+1)) 
+    Aout(i, N+i  ) = Aout(i,i) + 1.d0/dt
+enddo
+!Aout(N,N+N) = Aout(N,N+N) + 1/dt            ! для N не надо, последнее уравнение p - p_out = 0
 !(dG/dp)
 do j = 1, N
-    Aout(j+N,j) = 1
+    Aout(j+N,j) = 1.d0
 enddo
 !(dG/dw)
 do j = 1, N
@@ -186,11 +189,11 @@ do while(max(differenceP, differenceW) > eps)
         Print*, W0(i), ' W0 '
     end do
     Print*, '    '
-    call makeFluidMatrixAndRHSRadial(xBound,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
+    call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
     matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
     F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
     G = Gfunction(P0, W0, matrPfromW, N/2)
-    A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xBound, fluidParams, P0, W0, hh)
+    A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xx, fluidParams, P0, W0, hh)
     Ainvert(1:N,1:N) = invertMatrix(A, N)
     !call PrintMatrix(matrPfromW,N/2,N/2)
     !call PrintMatrix(A,N,N)

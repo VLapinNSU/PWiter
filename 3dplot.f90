@@ -2,7 +2,7 @@
 use functionsFG                     ! функции удобно выносить в модули, тогда файл меньше
 use elasticRadial
 implicit none                       ! это запрещает использование неописанных переменных 
-integer, parameter :: Nmax = 8    ! позволяет менять размеры сразу у всех массивов
+integer, parameter :: Nmax = 10    ! позволяет менять размеры сразу у всех массивов
 real(8), dimension(Nmax/2) :: P, W, Wn, P0, W0, P1, W1
 real(8), dimension(Nmax) :: relax  
 real(8) :: eps, pout, hh
@@ -25,11 +25,14 @@ NN05 = Nmax/2   ! размер каждого вектора w, p
 !call testFluidMatrixRadial()    
 ! set parameters (!!!!! p[MPa], w[mm], mu[MPa*s])
 ElasticCoef = 8.d0/3.14159265d0/20.d0*(1-0.25d0**2)
-Rfrac = 10.d0   
 call setFluidParamsForTest(fluidParams)         
-fluidParams%pout = 0.01d0   ;   fluidParams%mu = 1.d0/1.d6
-Xcentr(1:NN05) = (/ (i, i = 1, NN05) /) * Rfrac/NN05 + (Rfrac/NN05)/2
+Rfrac = 4.d0   
+fluidParams%pout = 0.01d0
+fluidParams%mu = 1.d0/1.d6  ! mu[MPa*s]
+fluidParams%dt = 100.d0
 Xbound(0:NN05) = (/ (i, i = 0, NN05) /) * Rfrac/NN05
+!Xcentr(1:NN05) = (/ (i, i = 1, NN05) /) * Rfrac/NN05 + (Rfrac/NN05)/2
+do i = 1, NN05  ;   Xcentr(i) = 0.5d0*(Xbound(i-1)+Xbound(i))    ;   enddo
 Wn = 0.d0
 ! initial step, to make fluid matrix 
 call makeElasticMatrixRadial(Xbound,Rfrac,NN05, matrWfromP)    

@@ -1,8 +1,8 @@
 #!MC 1410
-$!VarSet |LFDSFN1| = '"NewtonW.plt"'
-$!VarSet |LFDSVL1| = '"X" "F"'
-$!VarSet |LFDSFN2| = '"RelaxW.plt"'
-$!VarSet |LFDSVL2| = '"X" "F"'
+$!VarSet |LFDSFN1| = '"NewtonHist.plt"'
+$!VarSet |LFDSVL1| = '"V1" "V2" "V3"'
+$!VarSet |LFDSFN2| = '"RelaxHist.plt"'
+$!VarSet |LFDSVL2| = '"V1" "V2" "V3"'
 $!SETSTYLEBASE FACTORY
 $!PLOTOPTIONS 
   SUBDIVIDEALLCELLS = NO
@@ -80,7 +80,7 @@ $!FRAMENAME  = 'Frame 001'
 $!GLOBALTIME 
   SOLUTIONTIME = 0
 $!DELETELINEMAPS 
-$!ACTIVELINEMAPS  =  [1-2]
+$!ACTIVELINEMAPS  =  [1-4]
 $!GLOBALLINEPLOT 
   DATALABELS
     {
@@ -94,7 +94,7 @@ $!GLOBALLINEPLOT
       }
     }
 $!LINEMAP  [1]
-  NAME = '&ZN&'
+  NAME = '&DV&'
   ASSIGN
     {
     ZONE = 1
@@ -104,6 +104,7 @@ $!LINEMAP  [1]
   LINES
     {
     COLOR = RED
+    LINETHICKNESS = 0.4
     }
   SYMBOLS
     {
@@ -120,7 +121,34 @@ $!LINEMAP  [1]
     COLOR = RED
     }
 $!LINEMAP  [2]
-  NAME = 'ZONE 001'
+  NAME = '&DV&'
+  ASSIGN
+    {
+    ZONE = 1
+    XAXISVAR = 1
+    YAXISVAR = 3
+    }
+  LINES
+    {
+    COLOR = GREEN
+    LINETHICKNESS = 0.4
+    }
+  SYMBOLS
+    {
+    COLOR = GREEN
+    FILLCOLOR = GREEN
+    }
+  BARCHARTS
+    {
+    COLOR = GREEN
+    FILLCOLOR = GREEN
+    }
+  ERRORBARS
+    {
+    COLOR = GREEN
+    }
+$!LINEMAP  [3]
+  NAME = 'V2'
   ASSIGN
     {
     ZONE = 2
@@ -129,15 +157,13 @@ $!LINEMAP  [2]
     }
   LINES
     {
-    COLOR = GREEN
+    COLOR = RED
+    LINEPATTERN = DASHED
+    LINETHICKNESS = 0.4
     }
   SYMBOLS
     {
-    SYMBOLSHAPE
-      {
-      GEOMSHAPE = DEL
-      }
-    COLOR = GREEN
+    COLOR = RED
     FILLCOLOR = RED
     }
   BARCHARTS
@@ -148,6 +174,34 @@ $!LINEMAP  [2]
   ERRORBARS
     {
     COLOR = RED
+    }
+$!LINEMAP  [4]
+  NAME = 'V3'
+  ASSIGN
+    {
+    ZONE = 2
+    XAXISVAR = 1
+    YAXISVAR = 3
+    }
+  LINES
+    {
+    COLOR = GREEN
+    LINEPATTERN = DASHED
+    LINETHICKNESS = 0.4
+    }
+  SYMBOLS
+    {
+    COLOR = GREEN
+    FILLCOLOR = GREEN
+    }
+  BARCHARTS
+    {
+    COLOR = GREEN
+    FILLCOLOR = GREEN
+    }
+  ERRORBARS
+    {
+    COLOR = GREEN
     }
 $!XYLINEAXIS 
   DEPXTOYRATIO = 1
@@ -162,15 +216,17 @@ $!XYLINEAXIS
 $!XYLINEAXIS 
   XDETAIL 1
     {
-    RANGEMIN = 0.5
-    RANGEMAX = 3.5003000000000002
-    GRSPACING = 0.2
+    COORDSCALE = LOG
+    RANGEMIN = 1
+    RANGEMAX = 1478.1477
+    GRSPACING = 200
     TICKLABEL
       {
       TEXTSHAPE
         {
         HEIGHT = 4
         }
+      OFFSET = 2
       }
     TITLE
       {
@@ -185,9 +241,10 @@ $!XYLINEAXIS
 $!XYLINEAXIS 
   YDETAIL 1
     {
-    RANGEMIN = 0.0042916601523756981
-    RANGEMAX = 0.022885259495023638
-    GRSPACING = 0.002
+    COORDSCALE = LOG
+    RANGEMIN = 3.4414400218452101E-009
+    RANGEMAX = 0.31107910585071002
+    GRSPACING = 0.05
     TICKLABEL
       {
       TEXTSHAPE
@@ -205,8 +262,6 @@ $!XYLINEAXIS
         }
       }
     }
-$!LINEPLOTLAYERS 
-  SHOWSYMBOLS = YES
 $!FRAMECONTROL ACTIVATEBYNUMBER
   FRAME = 1
 $!SETSTYLEBASE CONFIG
