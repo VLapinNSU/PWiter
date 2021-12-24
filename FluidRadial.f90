@@ -107,10 +107,10 @@ real(8) :: rp, rm, wp, wm, wm3r, wp3r, hh                           ! r_{i+-1}, 
     ! inflow boundary ! 
     RHS(1,1) = RHS(1,1) - fluidParams%qin / (2.d0*pi) / xx(1) / hh      ! аппроксимация потока в i+1/2 уже есть
     ! outflow boundary
-    RHS(1,NN) = fluidParams%pout
-    matrAp(2,NN) = 1.d0     ;       matrAp(1,NN) = 0.d0
+    RHS(1,NN) =-fluidParams%pout        ! last equation is -p=-p_out    to have positive matrix (-A)>0
+    matrAp(2,NN) =-1.d0     ;       matrAp(1,NN) = 0.d0
 
-end subroutine makeFluidMatrixAndRHSRadial
+ end subroutine makeFluidMatrixAndRHSRadial
 
 
 

@@ -11,14 +11,14 @@ real(8) :: hh, dt, qin, pi
 real(8), dimension(NN) :: P, W, func, xx
 real(8) :: matrAp(NN,NN)   
 
-    func(1) = func(1) - qin / (2.d0*pi) / xx(1) / hh
-    do i = 2, NN-1
+    do i = 1, NN-1
         func(i) = W(i)/dt
         do j = 1, NN
             func(i) = func(i) - matrAp(i,j)*P(j)
         end do
     end do
-    func(NN) = P(NN) - 0.d0         ! TODO: добавить параметр p_out. Уравнение должно быть P-p_out = 0
+    func(1) = func(1) - qin / (2.d0*pi) / xx(1) / hh
+    !func(NN) =-P(NN) - 0.d0         ! TODO: добавить параметр p_out. Уравнение должно быть P-p_out = 0     ! uncomment for  -p+p_out
     
 end function
     
@@ -99,20 +99,20 @@ real(8) :: xBound(0:N)   !N=2
 real(8), dimension(N) :: P, W
 integer:: i, j
 Aout = 0.d0
-Aout(1, N+1) = ( (0.5*3*W(1)**2) / (12*fluidParams%mu*hh**2) ) * (P(1)-P(2))
-Aout(1, N+2) = ( (0.5*3*xBound(2)*W(2)**2) / (12*fluidParams%mu*hh**2*xBound(1)) ) * (P(1)-P(2))
 !сложная нумерация. Заполнил матрицу по четвертям
 !(dF/dp)(dF/dw)
 !(dG/dp)(dG/dw)
 
 !(dF/dw)
+Aout(1, N+1) = ( (0.5*3*W(1)**2) / (12*fluidParams%mu*hh**2) ) * (P(1)-P(2))
+Aout(1, N+2) = ( (0.5*3*xBound(2)*W(2)**2) / (12*fluidParams%mu*hh**2*xBound(1)) ) * (P(1)-P(2))
+Aout(1,N+1) = Aout(1,1) + 1/dt
 do i = 2, N-1
     Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
     Aout(i, N+i) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
     Aout(i, N+i+1) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
     Aout(i, N+i) = Aout(i,i) + 1/dt
 enddo
-Aout(1,N+1) = Aout(1,1) + 1/dt
 Aout(N,N+N) = Aout(1,1) + 1/dt          ! для N не надо, последнее уравнение p - p_out = 0
 !(dF/dp)
 do i = 1, N
