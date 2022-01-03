@@ -19,7 +19,7 @@ real(8) :: matrAp(NN,NN)
         end do
     end do
     func(1) = func(1) - qin / (2.d0*pi) / xx(1) / hh
-    
+    !print *, qin / (2.d0*pi) / xx(1) / hh
 end function
     
 function Gfunction(P, W, matrPfromW, NN) result(func)
@@ -46,14 +46,14 @@ real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)
 integer :: Iter
 real(8) :: WprevTimeStep(1:N/2)     ! width distribution at previous time step
 real(8) :: RHS(1,1:N/2)               ! right hand side of fluid equation. is not used here
-real(8) :: xBound(0:N/2)            ! coordinates of cell boundaries (not centr)
+!real(8) :: xBound(0:N/2)            ! coordinates of cell boundaries (not centr)
 
-xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = xx(1)-0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
+!xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = xx(1)-0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
 differenceP = 1.0
 differenceW = 1.0 
 WprevTimeStep = 0.d0
 open(10,file = 'RelaxHist.plt')
-!write(10,'(A)') 'Variables = Iter, difP, difW'
+write(10,'(A)') 'Variables = Iter, difP, difW'
 Iter = 0
 do while(max(differenceP, differenceW) > eps)  
     Iter = Iter + 1
@@ -86,7 +86,7 @@ end do
 do i = 1, N/2
     Print*, W0(i)
 end do
-Print*, '    '
+Print*, 'Iter=    ', Iter
 end subroutine
 
 function dFdxForNewton(matrAp, matrPfromW, dt, N, xx, fluidParams, P, W, hh) result(Aout) 
@@ -99,10 +99,6 @@ real(8) :: xx(1:N)          ! in makeFluidMatrixAndRHSRadial cell centres are us
 real(8), dimension(N) :: P, W
 integer:: i, j
 Aout = 0.d0
-!сложная нумерация. Заполнил матрицу по четвертям
-!(dF/dp)(dF/dw)
-!(dG/dp)(dG/dw)
-
 !(dF/dp)
 do i = 1, N
     do j = 1, N
@@ -111,8 +107,6 @@ do i = 1, N
 enddo
 !Aout(N,N) = 1.d0                            ! last F equation is p-p_out = 0 => dF/dp =1
 !(dF/dw)
-!Aout(1, N+1) = ( (0.5*3*W(1)**2) / (12*fluidParams%mu*hh**2) ) * (P(1)-P(2))
-!Aout(1, N+2) = ( (0.5*3*xx(2)*W(2)**2) / (12*fluidParams%mu*hh**2*xx(1)) ) * (P(1)-P(2))
 Aout(1, N+1) = ( (0.5d0*3.d0*xx(1  )*W(1  )**2) / (12.d0*fluidParams%mu*hh**2*xx(1)) ) * (P(1)-P(2)) 
 Aout(1, N+2) = ( (0.5d0*3.d0*xx(2  )*W(2  )**2) / (12.d0*fluidParams%mu*hh**2*xx(1)) ) * (P(1)-P(2))
 Aout(1, N+1) = Aout(1,N+1) + 1.d0/dt
@@ -120,7 +114,7 @@ do i = 2, N-1
     Aout(i, N+i-1) = ( (0.5d0*3.d0*xx(i-1)*W(i-1)**2) / (12.d0*fluidParams%mu*hh**2*xx(i)) ) * (P(i)-P(i-1))
     Aout(i, N+i+1) = ( (0.5d0*3.d0*xx(i+1)*W(i+1)**2) / (12.d0*fluidParams%mu*hh**2*xx(i)) ) * (P(i)-P(i+1))
     Aout(i, N+i  ) = ( (0.5d0*3.d0*xx(i  )*W(i  )**2) / (12.d0*fluidParams%mu*hh**2*xx(i)) ) * (2.d0*P(i)-P(i-1)-P(i+1)) 
-    Aout(i, N+i  ) = Aout(i,i) + 1.d0/dt
+    Aout(i, N+i  ) = Aout(i,N+i) + 1.d0/dt
 enddo
 !Aout(N,N+N) = Aout(N,N+N) + 1/dt            ! для N не надо, последнее уравнение p - p_out = 0
 !(dG/dp)
@@ -134,30 +128,30 @@ do i = 1, N
 enddo
 enddo
 !do i = 1, 2*N
-!    if ((i>1).and.(i<N)) then   ! общий случай  
-!        Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
-!        Aout(i, N+i) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
-!        Aout(i, N+i+1) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
-!    end if
-!    do j = 1, 2*N
-!        if (i <= N) then
-!            if (j <= N) then
-!                Aout(i,j) = - matrAp(i,j)
-!            else
-!                if (i == j-N) then
-!                    Aout(i,j) = Aout(i,j) + 1/dt
-!                end if
-!            end if    
-!        else
-!            if (j <= N) then
-!                if (i-N == j) then
-!                    Aout(i,j) = 1
-!                end if 
-!            else
-!                Aout(i,j) = - matrPfromW(i-N,j-N)
-!            end if  
-!        end if    
-!    end do
+! if ((i>1).and.(i<N)) then ! общий случай
+! Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
+! Aout(i, N+i) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
+! Aout(i, N+i+1) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
+! end if
+! do j = 1, 2*N
+! if (i <= N) then
+! if (j <= N) then
+! Aout(i,j) = - matrAp(i,j)
+! else
+! if ((i == j-N).and.(i<N)) then
+! Aout(i,j) = Aout(i,j) + 1/dt
+! end if
+! end if
+! else
+! if (j <= N) then
+! if (i-N == j) then
+! Aout(i,j) = 1
+! end if
+! else
+! Aout(i,j) = - matrPfromW(i-N,j-N)
+! end if
+! end if
+! end do
 !end do
 end function
 
@@ -171,9 +165,9 @@ real(8), dimension(1:N, 1:N) :: Ainvert
 real(8), dimension(N, N) :: A
 real(8) :: WprevTimeStep(1:N/2)     ! width distribution at previous time step
 real(8) :: RHS(1,1:N/2)               ! right hand side of fluid equation. is not used here
-real(8) :: xBound(0:N/2)            ! coordinates of cell boundaries (not centr)
+!real(8) :: xBound(0:N/2)            ! coordinates of cell boundaries (not centr)
 
-xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = xx(1)-0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
+!xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = xx(1)-0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
 differenceP = 1.0
 differenceW = 1.0 
 WprevTimeStep = 0.d0

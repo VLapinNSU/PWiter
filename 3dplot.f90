@@ -2,7 +2,7 @@
 use functionsFG                     ! функции удобно выносить в модули, тогда файл меньше
 use elasticRadial
 implicit none                       ! это запрещает использование неописанных переменных 
-integer, parameter :: Nmax = 10    ! позволяет менять размеры сразу у всех массивов
+integer, parameter :: Nmax = 8   ! позволяет менять размеры сразу у всех массивов
 real(8), dimension(Nmax/2) :: P, W, Wn, P0, W0, P1, W1
 real(8), dimension(Nmax) :: relax  
 real(8) :: eps, pout, hh
@@ -37,6 +37,7 @@ Wn = 0.d0
 ! initial step, to make fluid matrix 
 call makeElasticMatrixRadial(Xbound,Rfrac,NN05, matrWfromP)    
 matrPfromW = invertMatrix(matrWfromP(1:NN05,1:NN05), NN05)  
+!call PrintMatrix(matrPfromW,NN05,NN05)
 pout = 0.01d0
 P = pout
 W(1:NN05) = matmul(matrWfromP(1:NN05,1:NN05),P(1:NN05))*ElasticCoef
@@ -53,26 +54,29 @@ call makeFluidMatrixAndRHSRadial(Xcentr,NN05,fluidParams,W,Wn,matrAp,RHS)
 
 eps = 1.d-8
 hh = Xcentr(2)-Xcentr(1)
-
+do i = 1, Nmax/2
+    print *, Xcentr(i)
+end do
+print *, hh
+!call PrintMatrix(matrPfromW, NN05, NN05)
 ! начальное приближение
-P0(1:NN05) = 1.d-6
-W0(1:NN05) = 1.d-3
+P0(1:NN05) = 1.d-3
+W0(1:NN05) = 1.d-2
 PRINT*,"Newton's method:"
 matrAp2(1:3,1:NN05) = matrAp(1:3,1:NN05)  ! matrAp после метода Ньютона возвращается видоизмененной, поэтому запоминаю ее первоначальный вид в matrAp2
 call NewtonMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp(1:3,1:NN05), fluidParams)
 call Grafik1D(Xcentr,P0,NN05,'NewtonP.plt')
 call Grafik1D(Xcentr,W0,NN05,'NewtonW.plt')
-
 PRINT*,"Relaxation method :"
 ! начальное приближение
-P0(1:NN05) = 0.000001d0
-W0(1:NN05) = 0.000001d0
+P0(1:NN05) = 1.d-3
+W0(1:NN05) = 1.d-2
 relax(1:NN) = 0.1d0
 ! Метод релаксации сошелся! (при NN=4)
 call RelaxMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, relax(1:NN), matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp2(1:3,1:NN05), fluidParams)
+! Кажется, я нашла причину, почему метод релаксации и метод Ньютона выдавали разные результаты. Система имеет несколько решений и если взять начальные приближения не достаточно близкими к некоторому корню системы, то методы выдают разные корни. Я взяла начальное приближение близкое к тому корню, что выдал метод релаксации и метод Ньютона сошелся к тому же корню, что и метод релаксации.
+! Я нашла онлайн решение системы для N=2 (т.е. система из 4 уравнений) и у нее есть два решения. Думаю, аналогично и для больших N.
 call Grafik1D(Xcentr,P0,NN05,'RelaxP.plt')
 call Grafik1D(Xcentr,W0,NN05,'RelaxW.plt')
-! Оба метода сошлись к почти одинаковому решению (компоненты w3 отличаются, остальные совпадают). Очевидно, что в точном решении w4=p4 из вида системы. Оба метода получили решение, где w4=p4, как и должно быть. 
-
     
 END PROGRAM demo
