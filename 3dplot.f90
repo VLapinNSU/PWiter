@@ -16,6 +16,7 @@ type(TfluidParams) :: fluidParams   ! parameters for fluid
 real(8) :: matrAp(3,Nmax/2), matrAp2(3,Nmax/2)       ! fluid matrix [3,1..NN] with boundary conditions
 real(8) :: RHS(1,1:Nmax)              ! Right hand side [1,1..NN] with boundary conditions
 real(8) :: Xcentr(1:Nmax/2), Xbound(0:Nmax/2)               ! mesh, cell centers [1..NN] and cell boundaries [0;Rfrac], [0..NN]
+real    :: timeNewton, timeRelax, timePrev, t(2), etime
 
 NN = Nmax       ! размер всей системы уравнений
 NN05 = Nmax/2   ! размер каждого вектора w, p
@@ -64,7 +65,10 @@ P0(1:NN05) = 1.d-3
 W0(1:NN05) = 1.d-2
 PRINT*,"Newton's method:"
 matrAp2(1:3,1:NN05) = matrAp(1:3,1:NN05)  ! matrAp после метода Ньютона возвращается видоизмененной, поэтому запоминаю ее первоначальный вид в matrAp2
+ 
+timePrev = etime( t )
 call NewtonMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp(1:3,1:NN05), fluidParams)
+timeNewton = etime( t ) - timePrev
 call Grafik1D(Xcentr,P0,NN05,'NewtonP.plt')
 call Grafik1D(Xcentr,W0,NN05,'NewtonW.plt')
 PRINT*,"Relaxation method :"
@@ -73,10 +77,15 @@ P0(1:NN05) = 1.d-3
 W0(1:NN05) = 1.d-2
 relax(1:NN) = 0.1d0
 ! Метод релаксации сошелся! (при NN=4)
+timePrev = etime( t )
 call RelaxMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, pi, hh, eps, relax(1:NN), matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp2(1:3,1:NN05), fluidParams)
+timeRelax = etime( t ) - timePrev
+
 ! Кажется, я нашла причину, почему метод релаксации и метод Ньютона выдавали разные результаты. Система имеет несколько решений и если взять начальные приближения не достаточно близкими к некоторому корню системы, то методы выдают разные корни. Я взяла начальное приближение близкое к тому корню, что выдал метод релаксации и метод Ньютона сошелся к тому же корню, что и метод релаксации.
 ! Я нашла онлайн решение системы для N=2 (т.е. система из 4 уравнений) и у нее есть два решения. Думаю, аналогично и для больших N.
 call Grafik1D(Xcentr,P0,NN05,'RelaxP.plt')
 call Grafik1D(Xcentr,W0,NN05,'RelaxW.plt')
     
+write(*,'(A,F8.3,A)') 'time Newton = ', timeNewton, ' s'
+write(*,'(A,F8.3,A)') 'time Relax  = ', timeRelax , ' s'
 END PROGRAM demo
