@@ -57,13 +57,13 @@ write(10,'(A)') 'Variables = Iter, difP, difW'
 Iter = 0
 do while(max(differenceP, differenceW) > eps)  
     Iter = Iter + 1
-    do i = 1, N/2
-        Print*, P0(i)
-    end do
-    do i = 1, N/2
-        Print*, W0(i)
-    end do
-    Print*, '    '
+    !do i = 1, N/2
+    !    Print*, P0(i)
+    !end do
+    !do i = 1, N/2
+    !    Print*, W0(i)
+    !end do
+    !Print*, '    '
     call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
     matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
     !call PrintMatrix(matrApconvert, N/2, N/2)
@@ -127,32 +127,6 @@ do i = 1, N
     Aout(i+N,j+N) = - matrPfromW(i,j)
 enddo
 enddo
-!do i = 1, 2*N
-! if ((i>1).and.(i<N)) then ! общий случай
-! Aout(i, N+i-1) = ( (0.5*3*xBound(i-1)*W(i-1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i-1))
-! Aout(i, N+i) = ( (0.5*3*W(i)**2) / (12*fluidParams%mu*hh**2) ) * (2*P(i)-P(i-1)-P(i+1))
-! Aout(i, N+i+1) = ( (0.5*3*xBound(i+1)*W(i+1)**2) / (12*fluidParams%mu*hh**2*xBound(i)) ) * (P(i)-P(i+1))
-! end if
-! do j = 1, 2*N
-! if (i <= N) then
-! if (j <= N) then
-! Aout(i,j) = - matrAp(i,j)
-! else
-! if ((i == j-N).and.(i<N)) then
-! Aout(i,j) = Aout(i,j) + 1/dt
-! end if
-! end if
-! else
-! if (j <= N) then
-! if (i-N == j) then
-! Aout(i,j) = 1
-! end if
-! else
-! Aout(i,j) = - matrPfromW(i-N,j-N)
-! end if
-! end if
-! end do
-!end do
 end function
 
 subroutine NewtonMethod(P0, W0, N, dt, qin, pi, hh, eps, matrPfromW, xx, matrAp, fluidParams)
@@ -176,13 +150,13 @@ open(10,file = 'NewtonHist.plt')
 Iter = 0
 do while(max(differenceP, differenceW) > eps)  
     Iter = Iter + 1
-    do i = 1, N/2
-        Print*, P0(i), ' P0 '
-    end do
-    do i = 1, N/2
-        Print*, W0(i), ' W0 '
-    end do
-    Print*, '    '
+    !do i = 1, N/2
+    !    Print*, P0(i), ' P0 '
+    !end do
+    !do i = 1, N/2
+    !    Print*, W0(i), ' W0 '
+    !end do
+    !Print*, '    '
     call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
     matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
     F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
@@ -214,7 +188,7 @@ end do
 do i = 1, N/2
     Print*, W0(i), ' W0 '
 end do
-Print*, '    '
+Print*, Iter, '= Newtons iterations'
 end subroutine
     
 function invertMatrix(Ain, NN) result(Aout) 
