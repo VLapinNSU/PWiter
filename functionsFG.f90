@@ -86,7 +86,7 @@ end do
 do i = 1, N/2
     Print*, W0(i)
 end do
-Print*, 'Iter=    ', Iter
+Print*, Iter, '= Relaxs iterations'
 end subroutine
 
 function dFdxForNewton(matrAp, matrPfromW, dt, N, xx, fluidParams, P, W, hh) result(Aout) 
@@ -189,6 +189,65 @@ do i = 1, N/2
     Print*, W0(i), ' W0 '
 end do
 Print*, Iter, '= Newtons iterations'
+end subroutine
+
+subroutine MethodLevenbergMarkvardt(P0, W0, N, dt, qin, pi, hh, eps, lambda, matrPfromW, xx, matrAp, fluidParams)
+type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
+integer:: N, i, k, Iter
+real(8) :: hh, dt, pi, qin, eps, differenceP, differenceW, lambda, E
+real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx
+real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)  
+real(8), dimension(1:N, 1:N) :: Ainvert
+real(8), dimension(N, N) :: J, JT, A, B ! JT = J^T, A = (J^T)*J+lambda*I, B = ((J^T)*J+lambda*I)^(-1)*(J^T)
+real(8) :: WprevTimeStep(1:N/2)     ! width distribution at previous time step
+real(8) :: RHS(1,1:N/2)               ! right hand side of fluid equation. is not used here
+differenceP = 1.d0
+differenceW = 1.d0
+E = 1.d0
+WprevTimeStep = 0.d0
+open(10,file = 'LevenbergMarkvardtHist.plt')
+!write(10,'(A)') 'Variables = Iter, difP, difW'
+Iter = 0
+do while(E > eps) 
+    Iter = Iter + 1
+    call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
+    matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
+    F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
+    G = Gfunction(P0, W0, matrPfromW, N/2)
+    J(1:N, 1:N) = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xx, fluidParams, P0, W0, hh)
+    JT(1:N, 1:N) = transpose(J(1:N, 1:N)) ! JT = J^T, транспонирую матрицу J
+    !call PrintMatrix(J,N,N)
+    !call PrintMatrix(JT,N,N)
+    A(1:N, 1:N) = matmul(JT(1:N, 1:N), J(1:N, 1:N))
+    do i = 1, N
+        A(i,i) = A(i,i) + lambda     ! A = (J^T)*J+lambda*I
+    end do       
+    Ainvert(1:N,1:N) = invertMatrix(A(1:N, 1:N), N)
+    B(1:N,1:N) = matmul(Ainvert(1:N,1:N), JT(1:N,1:N))  ! B = ((J^T)*J+lambda*I)^(-1)*(J^T)
+    do i = 1, N/2 
+        Pn(i) = P0(i)
+        Wn(i) = W0(i)
+        do k = 1, N/2
+            Pn(i) = Pn(i) - (B(i,k)*F(k) + B(i,k+N/2)*G(k))
+            Wn(i) = Wn(i) - (B(i+N/2,k)*F(k) + B(i+N/2,k+N/2)*G(k))
+        end do
+    end do
+    E=0.d0
+    do i = 1, N/2 
+        E = E + F(i)*F(i) + G(i)*G(i) ! берем такую фукцию ошибки
+    end do
+    P0(1:N/2) = Pn(1:N/2)
+    W0(1:N/2) = Wn(1:N/2)
+    write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW
+end do
+close(10)
+do i = 1, N/2
+    Print*, P0(i), ' P0 '
+end do
+do i = 1, N/2
+    Print*, W0(i), ' W0 '
+end do
+Print*, Iter, '= LevenbergMarkvardts iterations'
 end subroutine
     
 function invertMatrix(Ain, NN) result(Aout) 
