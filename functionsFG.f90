@@ -4,16 +4,16 @@ implicit none
 
 contains 
 
-function Ffunction(P, W, dt, hh, pi, qin, xx, matrAp, NN) result(func)
+function Ffunction(P, W, WprevTimeStep, dt, hh, pi, qin, pout, xx, matrAp, NN) result(func)
 implicit none 
 integer:: i, j, NN
-real(8) :: hh, dt, qin, pi
-real(8), dimension(NN) :: P, W, func, xx
+real(8) :: hh, dt, qin, pi, pout
+real(8), dimension(NN) :: P, W, func, xx, WprevTimeStep
 real(8) :: matrAp(NN,NN)   
 
     do i = 1, NN
-        func(i) = W(i)/dt       
-        if (i==NN) func(i) = 0.d0       ! the last equation is P-p_out=0, no dW/dt, matrAp(NN,NN)=-1
+        func(i) = W(i)/dt - WprevTimeStep(i) / dt
+        if (i==NN) func(i) = -pout       ! the last equation is P-p_out=0, no dW/dt, matrAp(NN,NN)=-1
         do j = 1, NN
             func(i) = func(i) - matrAp(i,j)*P(j)
         end do
@@ -36,10 +36,10 @@ do i = 1, NN
 end do
 end function
 
-subroutine RelaxMethod(P0, W0, N, dt, qin, pi, hh, eps, relax, matrPfromW, xx, matrAp, fluidParams)
+subroutine RelaxMethod(P0, W0, N, dt, qin, pout, pi, hh, eps, relax, matrPfromW, xx, matrAp, fluidParams)
 type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
 integer:: N, i, k
-real(8) :: hh, dt, qin, pi, eps, differenceP, differenceW
+real(8) :: hh, dt, qin, pout, pi, eps, differenceP, differenceW
 real(8), dimension(N) :: relax !(1:N/2) - для F, (N/2+1:N) - для G
 real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx
 real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)        
@@ -67,7 +67,7 @@ do while(max(differenceP, differenceW) > eps)
     call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
     matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
     !call PrintMatrix(matrApconvert, N/2, N/2)
-    F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
+    F = Ffunction(P0, W0, WprevTimeStep, dt, hh, pi, qin,pout, xx, matrApconvert, N/2)
     G = Gfunction(P0, W0, matrPfromW, N/2)
     do i = 1, N/2
         Pn(i) = P0(i) - relax(i)*G(i)
@@ -129,22 +129,22 @@ enddo
 enddo
 end function
 
-subroutine NewtonMethod(P0, W0, N, dt, qin, pi, hh, eps, matrPfromW, xx, matrAp, fluidParams)
+subroutine NewtonMethod(P0, W0, N, dt, qin, pout, pi, hh, eps, matrPfromW, xx, matrAp, fluidParams,WprevTimeStep)
 type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
 integer:: N, i, j, Iter
-real(8) :: hh, dt, pi, qin, eps, differenceP, differenceW
+real(8) :: hh, dt, pi, qin, pout, eps, differenceP, differenceW
 real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx
 real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)  
 real(8), dimension(1:N, 1:N) :: Ainvert
 real(8), dimension(N, N) :: A
-real(8) :: WprevTimeStep(1:N/2)     ! width distribution at previous time step
+real(8), intent(IN) :: WprevTimeStep(1:N/2)     ! width distribution at previous time step
 real(8) :: RHS(1,1:N/2)               ! right hand side of fluid equation. is not used here
 !real(8) :: xBound(0:N/2)            ! coordinates of cell boundaries (not centr)
 
 !xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = xx(1)-0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
 differenceP = 1.0
 differenceW = 1.0 
-WprevTimeStep = 0.d0
+!WprevTimeStep = 0.d0
 open(10,file = 'NewtonHist.plt')
 !write(10,'(A)') 'Variables = Iter, difP, difW'
 Iter = 0
@@ -159,7 +159,7 @@ do while(max(differenceP, differenceW) > eps)
     !Print*, '    '
     call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
     matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
-    F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
+    F = Ffunction(P0, W0,WprevTimeStep, dt, hh, pi, qin, pout, xx, matrApconvert, N/2)
     G = Gfunction(P0, W0, matrPfromW, N/2)
     A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xx, fluidParams, P0, W0, hh)
     Ainvert(1:N,1:N) = invertMatrix(A, N)
@@ -191,10 +191,10 @@ end do
 Print*, Iter, '= Newtons iterations'
 end subroutine
 
-subroutine MethodLevenbergMarkvardt(P0, W0, N, dt, qin, pi, hh, eps, lambda, matrPfromW, xx, matrAp, fluidParams)
+subroutine MethodLevenbergMarkvardt(P0, W0, N, dt, qin, pout, pi, hh, eps, lambda, matrPfromW, xx, matrAp, fluidParams)
 type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
 integer:: N, i, k, Iter
-real(8) :: hh, dt, pi, qin, eps, differenceP, differenceW, lambda, E
+real(8) :: hh, dt, pi, qin,pout, eps, differenceP, differenceW, lambda, E
 real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx
 real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)  
 real(8), dimension(1:N, 1:N) :: Ainvert
@@ -212,7 +212,7 @@ do while(E > eps)
     Iter = Iter + 1
     call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
     matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
-    F = Ffunction(P0, W0, dt, hh, pi, qin, xx, matrApconvert, N/2)
+    F = Ffunction(P0, W0,WprevTimeStep, dt, hh, pi, qin,pout, xx, matrApconvert, N/2)
     G = Gfunction(P0, W0, matrPfromW, N/2)
     J(1:N, 1:N) = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xx, fluidParams, P0, W0, hh)
     JT(1:N, 1:N) = transpose(J(1:N, 1:N)) ! JT = J^T, транспонирую матрицу J
