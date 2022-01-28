@@ -208,7 +208,8 @@ WprevTimeStep = 0.d0
 open(10,file = 'LevenbergMarkvardtHist.plt')
 !write(10,'(A)') 'Variables = Iter, difP, difW'
 Iter = 0
-do while(E > eps) 
+do while ((E > eps).and.(Iter < 100000000)) 
+!do while ((max(differenceP, differenceW) > eps).and.(Iter < 10000000))  
     Iter = Iter + 1
     call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
     matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
@@ -219,9 +220,12 @@ do while(E > eps)
     !call PrintMatrix(J,N,N)
     !call PrintMatrix(JT,N,N)
     A(1:N, 1:N) = matmul(JT(1:N, 1:N), J(1:N, 1:N))
+    !call PrintMatrix(A,N,N)
     do i = 1, N
-        A(i,i) = A(i,i) + lambda     ! A = (J^T)*J+lambda*I
-    end do       
+        !A(i,i) = A(i,i) + lambda        ! A = (J^T)*J+lambda*I 
+        A(i,i) = A(i,i)*(1 + lambda)     ! A = (J^T)*J+lambda*Diag[(J^T)*J] - так лучше, учитываются скачки
+    end do    
+    !call PrintMatrix(A,N,N)
     Ainvert(1:N,1:N) = invertMatrix(A(1:N, 1:N), N)
     B(1:N,1:N) = matmul(Ainvert(1:N,1:N), JT(1:N,1:N))  ! B = ((J^T)*J+lambda*I)^(-1)*(J^T)
     do i = 1, N/2 
@@ -230,12 +234,16 @@ do while(E > eps)
         do k = 1, N/2
             Pn(i) = Pn(i) - (B(i,k)*F(k) + B(i,k+N/2)*G(k))
             Wn(i) = Wn(i) - (B(i+N/2,k)*F(k) + B(i+N/2,k+N/2)*G(k))
+            !Pn(i) = Pn(i) - (1/lambda)*(JT(i,k)*F(k) + JT(i,k+N/2)*G(k)) ! метод градиентого спуска
+            !Wn(i) = Wn(i) - (1/lambda)*(JT(i+N/2,k)*F(k) + JT(i+N/2,k+N/2)*G(k))
         end do
     end do
     E=0.d0
     do i = 1, N/2 
         E = E + F(i)*F(i) + G(i)*G(i) ! берем такую фукцию ошибки
     end do
+    differenceP = maxval( ABS(P0(1:N/2)-Pn(1:N/2)) )    
+    differenceW = maxval( ABS(W0(1:N/2)-Wn(1:N/2)) )
     P0(1:N/2) = Pn(1:N/2)
     W0(1:N/2) = Wn(1:N/2)
     write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW
