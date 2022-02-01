@@ -193,9 +193,9 @@ end subroutine
 
 subroutine MethodLevenbergMarkvardt(P0, W0, N, dt, qin, pout, pi, hh, eps, lambda, matrPfromW, xx, matrAp, fluidParams)
 type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
-integer:: N, i, k, Iter
-real(8) :: hh, dt, pi, qin,pout, eps, differenceP, differenceW, lambda, E
-real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx
+integer:: N, i, k, Iter, nu, r
+real(8) :: hh, dt, pi, qin,pout, eps, differenceP, differenceW, lambda, E, En
+real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx, Fn, Gn
 real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)  
 real(8), dimension(1:N, 1:N) :: Ainvert
 real(8), dimension(N, N) :: J, JT, A, B ! JT = J^T, A = (J^T)*J+lambda*I, B = ((J^T)*J+lambda*I)^(-1)*(J^T)
@@ -204,11 +204,14 @@ real(8) :: RHS(1,1:N/2)               ! right hand side of fluid equation. is no
 differenceP = 1.d0
 differenceW = 1.d0
 E = 1.d0
+En = 2.d0
 WprevTimeStep = 0.d0
 open(10,file = 'LevenbergMarkvardtHist.plt')
-!write(10,'(A)') 'Variables = Iter, difP, difW'
+write(10,'(A)') 'Variables = Iter, difP, difW'
 Iter = 0
-do while ((E > eps).and.(Iter < 100000000)) 
+nu = 10
+r = -1
+do while ((E > eps).and.(Iter < 100)) 
 !do while ((max(differenceP, differenceW) > eps).and.(Iter < 10000000))  
     Iter = Iter + 1
     call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
@@ -217,15 +220,11 @@ do while ((E > eps).and.(Iter < 100000000))
     G = Gfunction(P0, W0, matrPfromW, N/2)
     J(1:N, 1:N) = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xx, fluidParams, P0, W0, hh)
     JT(1:N, 1:N) = transpose(J(1:N, 1:N)) ! JT = J^T, транспонирую матрицу J
-    !call PrintMatrix(J,N,N)
-    !call PrintMatrix(JT,N,N)
-    A(1:N, 1:N) = matmul(JT(1:N, 1:N), J(1:N, 1:N))
-    !call PrintMatrix(A,N,N)
+    A(1:N, 1:N) = matmul(JT(1:N, 1:N), J(1:N, 1:N))   
     do i = 1, N
         !A(i,i) = A(i,i) + lambda        ! A = (J^T)*J+lambda*I 
         A(i,i) = A(i,i)*(1 + lambda)     ! A = (J^T)*J+lambda*Diag[(J^T)*J] - так лучше, учитываются скачки
     end do    
-    !call PrintMatrix(A,N,N)
     Ainvert(1:N,1:N) = invertMatrix(A(1:N, 1:N), N)
     B(1:N,1:N) = matmul(Ainvert(1:N,1:N), JT(1:N,1:N))  ! B = ((J^T)*J+lambda*I)^(-1)*(J^T)
     do i = 1, N/2 
@@ -234,18 +233,28 @@ do while ((E > eps).and.(Iter < 100000000))
         do k = 1, N/2
             Pn(i) = Pn(i) - (B(i,k)*F(k) + B(i,k+N/2)*G(k))
             Wn(i) = Wn(i) - (B(i+N/2,k)*F(k) + B(i+N/2,k+N/2)*G(k))
-            !Pn(i) = Pn(i) - (1/lambda)*(JT(i,k)*F(k) + JT(i,k+N/2)*G(k)) ! метод градиентого спуска
-            !Wn(i) = Wn(i) - (1/lambda)*(JT(i+N/2,k)*F(k) + JT(i+N/2,k+N/2)*G(k))
+            !Pn(i) = Pn(i) - (1/lambda)*2*(JT(i,k)*F(k) + JT(i,k+N/2)*G(k)) ! метод градиентого спуска
+            !Wn(i) = Wn(i) - (1/lambda)*2*(JT(i+N/2,k)*F(k) + JT(i+N/2,k+N/2)*G(k))
         end do
     end do
+    Fn = Ffunction(Pn, Wn, WprevTimeStep, dt, hh, pi, qin,pout, xx, matrApconvert, N/2)
+    Gn = Gfunction(Pn, Wn, matrPfromW, N/2)
+    En=0.d0
     E=0.d0
     do i = 1, N/2 
-        E = E + F(i)*F(i) + G(i)*G(i) ! берем такую фукцию ошибки
+        En = En + Fn(i)*Fn(i) + Gn(i)*Gn(i) ! берем такую фукцию ошибки
+        E = E + F(i)*F(i) + G(i)*G(i)
     end do
+    if (En < E) then
+        P0(1:N/2) = Pn(1:N/2)
+        W0(1:N/2) = Wn(1:N/2)  
+        r = -1
+    else
+        r = r + 1
+    end if
+    lambda = lambda* nu**r  !lambda_{k} = lambda_{k-1}*nu^r - меняем параметр
     differenceP = maxval( ABS(P0(1:N/2)-Pn(1:N/2)) )    
     differenceW = maxval( ABS(W0(1:N/2)-Wn(1:N/2)) )
-    P0(1:N/2) = Pn(1:N/2)
-    W0(1:N/2) = Wn(1:N/2)
     write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW
 end do
 close(10)
