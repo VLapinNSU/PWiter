@@ -193,7 +193,7 @@ end subroutine
 
 subroutine MethodLevenbergMarkvardt(P0, W0, N, dt, qin, pout, pi, hh, eps, lambda, matrPfromW, xx, matrAp, fluidParams)
 type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
-integer:: N, i, k, Iter, nu, r
+integer:: N, i, k, Iter, nu, r, l
 real(8) :: hh, dt, pi, qin,pout, eps, differenceP, differenceW, lambda, E, En
 real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx, Fn, Gn
 real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2)  
@@ -211,7 +211,7 @@ write(10,'(A)') 'Variables = Iter, difP, difW'
 Iter = 0
 nu = 10
 r = -1
-do while ((E > eps).and.(Iter < 100)) 
+do while ((E > eps).and.(Iter < 1000)) 
 !do while ((max(differenceP, differenceW) > eps).and.(Iter < 10000000))  
     Iter = Iter + 1
     call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
@@ -237,6 +237,8 @@ do while ((E > eps).and.(Iter < 100))
             !Wn(i) = Wn(i) - (1/lambda)*2*(JT(i+N/2,k)*F(k) + JT(i+N/2,k+N/2)*G(k))
         end do
     end do
+    call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,Wn,WprevTimeStep,matrAp,RHS)
+    matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
     Fn = Ffunction(Pn, Wn, WprevTimeStep, dt, hh, pi, qin,pout, xx, matrApconvert, N/2)
     Gn = Gfunction(Pn, Wn, matrPfromW, N/2)
     En=0.d0
@@ -245,14 +247,22 @@ do while ((E > eps).and.(Iter < 100))
         En = En + Fn(i)*Fn(i) + Gn(i)*Gn(i) ! берем такую фукцию ошибки
         E = E + F(i)*F(i) + G(i)*G(i)
     end do
+    !print*, 'En = ', En, 'E = ',  E
     if (En < E) then
         P0(1:N/2) = Pn(1:N/2)
         W0(1:N/2) = Wn(1:N/2)  
         r = -1
-    else
+        lambda = lambda*(1.d0/nu)!lambda_{k} = lambda_{k-1}*nu^r - меняем параметр
+        print*, 'here'
+    else  
         r = r + 1
+        l = r
+        do while (l > 0)
+            lambda = lambda*nu !lambda_{k} = lambda_{k-1}*nu^r - меняем параметр
+            l = l - 1
+        end do
     end if
-    lambda = lambda* nu**r  !lambda_{k} = lambda_{k-1}*nu^r - меняем параметр
+    print *, 'l = ', lambda
     differenceP = maxval( ABS(P0(1:N/2)-Pn(1:N/2)) )    
     differenceW = maxval( ABS(W0(1:N/2)-Wn(1:N/2)) )
     write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW

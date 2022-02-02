@@ -3,7 +3,7 @@ use functionsFG                     ! функции удобно выносит
 use elasticRadial
 use radialAnalyt
 implicit none                       ! это запрещает использование неописанных переменных 
-integer, parameter :: Nmax = 64! позволяет менять размеры сразу у всех массивов
+integer, parameter :: Nmax = 8! позволяет менять размеры сразу у всех массивов
 real(8), dimension(Nmax/2) :: P, W, Wn, P0, W0, P1, W1
 real(8), dimension(Nmax) :: relax  
 real(8) :: eps, hh, lambda
@@ -117,7 +117,8 @@ call Grafik1D(Xcentr,W0,NN05,'RelaxW.plt')
 PRINT*,"LevenbergMarkvardts method :"
 P0(1:NN05) = 1.d-3  ! начальное приближение
 W0(1:NN05) = 1.d-2
-lambda = 0.00000001d0 ! этот параметр нужно подбирать для каждого N
+!lambda = 0.000001d0 ! этот параметр нужно подбирать для каждого N - начальный регуляционный параметр
+lambda = 100.d0
 timePrev = etime( t )
 call MethodLevenbergMarkvardt(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, fluidParams%pout, &
     pi, hh, eps, lambda, matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp3(1:3,1:NN05), fluidParams)
