@@ -3,7 +3,7 @@ use functionsFG                     ! функции удобно выносит
 use elasticRadial
 use radialAnalyt
 implicit none                       ! это запрещает использование неописанных переменных 
-integer, parameter :: Nmax = 40 ! позволяет менять размеры сразу у всех массивов
+integer, parameter :: Nmax = 8! позволяет менять размеры сразу у всех массивов
 real(8), dimension(Nmax/2) :: P, W, Wn, P0, W0, P1, W1
 real(8), dimension(Nmax) :: relax  
 real(8) :: eps, hh, lambda
@@ -30,7 +30,7 @@ NN05 = Nmax/2   ! размер каждого вектора w, p
 ! set parameters (!!!!! p[MPa], w[mm], mu[MPa*s])
 call setFluidParamsForTest(fluidParams)         
 Rfrac = 30.d0   
-fluidParams%mu = 1.d0/1.d6  ! mu[MPa*s]
+fluidParams%mu = 0.1/1.d6  ! mu[MPa*s]
 Ep = 20.d0 / (1-0.25d0**2)  ! E[GPa]
 !fluidParams%mu = 0.1d0  ! mu[Pa*s]
 !Ep = 20.d0 / (1-0.25d0**2) * 1.e9 ! E[Pa]
@@ -105,7 +105,7 @@ call Grafik1D(Xcentr,Wn,NN05,'PrevStW.plt')
 PRINT*,"Relaxation method :"
 P0(1:NN05) = 1.d-3  ! начальное приближение
 W0(1:NN05) = 1.d-2
-relax(1:NN) = 0.01d0
+relax(1:NN) = 0.1d0
 timePrev = etime( t )
 call RelaxMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, fluidParams%pout, &
     pi, hh, eps, relax(1:NN), matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp2(1:3,1:NN05), fluidParams)
@@ -117,7 +117,8 @@ call Grafik1D(Xcentr,W0,NN05,'RelaxW.plt')
 PRINT*,"LevenbergMarkvardts method :"
 P0(1:NN05) = 1.d-3  ! начальное приближение
 W0(1:NN05) = 1.d-2
-lambda = 0.00001d0 ! этот параметр нужно брать как можно меньшим, тогда точность лучше и сходимость быстрее
+!lambda = 0.000001d0 ! этот параметр нужно подбирать для каждого N - начальный регуляционный параметр
+lambda = 100.d0
 timePrev = etime( t )
 call MethodLevenbergMarkvardt(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, fluidParams%pout, &
     pi, hh, eps, lambda, matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp3(1:3,1:NN05), fluidParams)
