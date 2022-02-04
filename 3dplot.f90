@@ -29,7 +29,7 @@ NN05 = Nmax/2   ! размер каждого вектора w, p
 !call testFluidMatrixRadial()    
 ! set parameters (!!!!! p[MPa], w[mm], mu[MPa*s])
 call setFluidParamsForTest(fluidParams)         
-Rfrac = 4.d0   
+Rfrac = 30.d0   
 fluidParams%mu = 1.d0/1.d6  ! mu[MPa*s]
 Ep = 20.d0 / (1-0.25d0**2)  ! E[GPa]
 !fluidParams%mu = 0.1d0  ! mu[Pa*s]
@@ -37,7 +37,7 @@ Ep = 20.d0 / (1-0.25d0**2)  ! E[GPa]
 
 ElasticCoef = 8.d0/3.14159265d0/Ep
 fluidParams%qin = 0.01d0 
-fluidParams%dt = 100.d0
+fluidParams%dt = 10000.d0
 fluidParams%pout = 0.0d0      ! can be varied in [-0.001d0;0.001d0]
 Xbound(0:NN05) = (/ (i, i = 0, NN05) /) * Rfrac/NN05
 !Xcentr(1:NN05) = (/ (i, i = 1, NN05) /) * Rfrac/NN05 + (Rfrac/NN05)/2
