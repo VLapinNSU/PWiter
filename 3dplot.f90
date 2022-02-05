@@ -29,37 +29,27 @@ NN05 = Nmax/2   ! размер каждого вектора w, p
 !call testFluidMatrixRadial()    
 ! set parameters (!!!!! p[MPa], w[mm], mu[MPa*s])
 call setFluidParamsForTest(fluidParams)         
-Rfrac = 30.d0   
-fluidParams%mu = 0.1/1.d6  ! mu[MPa*s]
-Ep = 20.d0 / (1-0.25d0**2)  ! E[GPa]
-!fluidParams%mu = 0.1d0  ! mu[Pa*s]
-!Ep = 20.d0 / (1-0.25d0**2) * 1.e9 ! E[Pa]
+Rfrac = 0.173775E+02            ! Rfrac50, t = 0.252549E+03, Rfrac49 = 0.163939E+02, tn = 0.221523E+03
+fluidParams%mu = 1.d0  ! mu[Pa*s]
+Ep = 10.d0 * 1.e9 ! E[Pa]
 
 ElasticCoef = 8.d0/3.14159265d0/Ep
 fluidParams%qin = 0.01d0 
-fluidParams%dt = 10000.d0
+fluidParams%dt = 100.d0
 fluidParams%pout = 0.0d0      ! can be varied in [-0.001d0;0.001d0]
 Xbound(0:NN05) = (/ (i, i = 0, NN05) /) * Rfrac/NN05
 !Xcentr(1:NN05) = (/ (i, i = 1, NN05) /) * Rfrac/NN05 + (Rfrac/NN05)/2
 do i = 1, NN05  ;   Xcentr(i) = 0.5d0*(Xbound(i-1)+Xbound(i))    ;   enddo
 Wn = 0.d0
     ! calculate current time moment 
-    TimeFracCurr = countTimeOfRadialR(fluidParams%qin,Ep*1.d9,fluidParams%mu*1.d6, Rfrac)
+    TimeFracCurr = countTimeOfRadialR(fluidParams%qin,Ep,fluidParams%mu, Rfrac)
     TimeFracPrev = TimeFracCurr - fluidParams%dt
-    RfracPrev = countROfRadialTime(fluidParams%qin,Ep*1.d9,fluidParams%mu*1.d6, TimeFracPrev)
+    RfracPrev = countROfRadialTime(fluidParams%qin,Ep,fluidParams%mu, TimeFracPrev)
     if (TimeFracPrev>1.d0) then 
         do i = 1, NN05  
-            !Wn(i) = countWidthFromRadialAnalyt(fluidParams%mu*1.d6, fluidParams%qin, Ep*1.d9, TimeFracPrev, Xcentr(i)/RfracPrev)! * 1.d3
+            Wn(i) = countWidthFromRadialAnalyt(fluidParams%mu, fluidParams%qin, Ep, TimeFracPrev, Xcentr(i)/RfracPrev)
         enddo
     endif
-    !TimeFracCurr = countTimeOfRadialR(fluidParams%qin,Ep,fluidParams%mu, Rfrac)
-    !TimeFracPrev = TimeFracCurr - fluidParams%dt
-    !RfracPrev = countROfRadialTime(fluidParams%qin,Ep,fluidParams%mu, TimeFracPrev)
-    !if (TimeFracPrev>1.d0) then 
-    !    do i = 1, NN05  
-    !        Wn(i) = countWidthFromRadialAnalyt(fluidParams%mu, fluidParams%qin, Ep, TimeFracPrev, Xcentr(i)/RfracPrev)
-    !    enddo
-    !endif
 
 
 ! initial step, to make fluid matrix 
