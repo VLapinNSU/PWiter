@@ -3,7 +3,7 @@ use functionsFG                     ! функции удобно выносит
 use elasticRadial
 use radialAnalyt
 implicit none                       ! это запрещает использование неописанных переменных 
-integer, parameter :: Nmax = 8! позволяет менять размеры сразу у всех массивов
+integer, parameter :: Nmax = 10! позволяет менять размеры сразу у всех массивов
 real(8), dimension(Nmax/2) :: P, W, Wn, P0, W0, P1, W1
 real(8), dimension(Nmax) :: relax  
 real(8) :: eps, hh, lambda
@@ -15,7 +15,7 @@ real(8) :: Rfrac       ! elastic and mesh parameters    !TODO: make common subro
 real(8) :: matrWfromP(Nmax/2,Nmax/2), matrPfromW(Nmax/2,Nmax/2)          ! matrix for w_k = T^s_k*p_s
 type(TfluidParams) :: fluidParams   ! parameters for fluid
 real(8) :: matrAp(3,Nmax/2), matrAp2(3,Nmax/2), matrAp3(3,Nmax/2)       ! fluid matrix [3,1..NN] with boundary conditions
-real(8) :: RHS(1,1:Nmax)              ! Right hand side [1,1..NN] with boundary conditions
+real(8) :: RHS(1,1:Nmax/2)              ! Right hand side [1,1..NN] with boundary conditions
 real(8) :: Xcentr(1:Nmax/2), Xbound(0:Nmax/2)               ! mesh, cell centers [1..NN] and cell boundaries [0;Rfrac], [0..NN]
 real    :: timeNewton, timeRelax, timePrev, t(2), etime, timeLevenbergMarkvardt ! Нужно ли здесь сделать t(3)?
 real(8) :: TimeFracCurr, TimeFracPrev, RfracPrev    ! current and previous time of fracture propagaton, radius at previous time moment
@@ -29,13 +29,13 @@ NN05 = Nmax/2   ! размер каждого вектора w, p
 !call testFluidMatrixRadial()    
 ! set parameters (!!!!! p[MPa], w[mm], mu[MPa*s])
 call setFluidParamsForTest(fluidParams)         
-Rfrac = 0.173775E+02            ! Rfrac50, t = 0.252549E+03, Rfrac49 = 0.163939E+02, tn = 0.221523E+03
+Rfrac = 0.173775E+02 / 0.94d0 ! tip is not included here           ! Rfrac50, t = 0.252549E+03, Rfrac49 = 0.163939E+02, tn = 0.221523E+03
 fluidParams%mu = 1.d0  ! mu[Pa*s]
 Ep = 10.d0 * 1.e9 ! E[Pa]
 
 ElasticCoef = 8.d0/3.14159265d0/Ep
 fluidParams%qin = 0.01d0 
-fluidParams%dt = 100.d0
+fluidParams%dt = 0.252549E+03 - 0.221523E+03
 fluidParams%pout = 0.0d0      ! can be varied in [-0.001d0;0.001d0]
 Xbound(0:NN05) = (/ (i, i = 0, NN05) /) * Rfrac/NN05
 !Xcentr(1:NN05) = (/ (i, i = 1, NN05) /) * Rfrac/NN05 + (Rfrac/NN05)/2
@@ -44,7 +44,7 @@ Wn = 0.d0
     ! calculate current time moment 
     TimeFracCurr = countTimeOfRadialR(fluidParams%qin,Ep,fluidParams%mu, Rfrac)
     TimeFracPrev = TimeFracCurr - fluidParams%dt
-    RfracPrev = countROfRadialTime(fluidParams%qin,Ep,fluidParams%mu, TimeFracPrev)
+    RfracPrev = countROfRadialTime(fluidParams%qin,Ep,fluidParams%mu, TimeFracPrev) / 0.94
     if (TimeFracPrev>1.d0) then 
         do i = 1, NN05  
             Wn(i) = countWidthFromRadialAnalyt(fluidParams%mu, fluidParams%qin, Ep, TimeFracPrev, Xcentr(i)/RfracPrev)
@@ -54,11 +54,12 @@ Wn = 0.d0
 
 ! initial step, to make fluid matrix 
 call makeElasticMatrixRadial(Xbound,Rfrac,NN05, matrWfromP)    
+matrWfromP = matrWfromP*ElasticCoef
 matrPfromW = invertMatrix(matrWfromP(1:NN05,1:NN05), NN05)  
 !call PrintMatrix(matrPfromW,NN05,NN05)
 P = fluidParams%pout
 P = 0.01d0
-W(1:NN05) = matmul(matrWfromP(1:NN05,1:NN05),P(1:NN05))*ElasticCoef
+W(1:NN05) = matmul(matrWfromP(1:NN05,1:NN05),P(1:NN05)) !*ElasticCoef
 call makeFluidMatrixAndRHSRadial(Xcentr,NN05,fluidParams,W,Wn,matrAp,RHS)
 !TODO: новые функции считаются как
 !Ffunc(1) = W/dt - matrAp*P - fluidParams%qin / (2.d0*pi) / Xcentr(1) / hh - Wn/dt
@@ -91,7 +92,7 @@ timeNewton = etime( t ) - timePrev
 call Grafik1D(Xcentr,P0,NN05,'NewtonP.plt')
 call Grafik1D(Xcentr,W0,NN05,'NewtonW.plt')
 call Grafik1D(Xcentr,Wn,NN05,'PrevStW.plt')
-
+stop
 PRINT*,"Relaxation method :"
 P0(1:NN05) = 1.d-3  ! начальное приближение
 W0(1:NN05) = 1.d-2

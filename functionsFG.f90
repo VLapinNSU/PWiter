@@ -11,9 +11,9 @@ real(8) :: hh, dt, qin, pi, pout
 real(8), dimension(NN) :: P, W, func, xx, WprevTimeStep
 real(8) :: matrAp(NN,NN)   
 
+    func(1:NN-1) = W(1:NN-1)/dt - WprevTimeStep(1:NN-1) / dt 
+    func(NN) = -pout       ! the last equation is P-p_out=0, no dW/dt, matrAp(NN,NN)=-1
     do i = 1, NN
-        func(i) = W(i)/dt - WprevTimeStep(i) / dt
-        if (i==NN) func(i) = -pout       ! the last equation is P-p_out=0, no dW/dt, matrAp(NN,NN)=-1
         do j = 1, NN
             func(i) = func(i) - matrAp(i,j)*P(j)
         end do
@@ -140,6 +140,7 @@ real(8), dimension(N, N) :: A
 real(8), intent(IN) :: WprevTimeStep(1:N/2)     ! width distribution at previous time step
 real(8) :: RHS(1,1:N/2)               ! right hand side of fluid equation. is not used here
 !real(8) :: xBound(0:N/2)            ! coordinates of cell boundaries (not centr)
+real(8) :: xtmp(1:N)
 
 !xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = xx(1)-0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
 differenceP = 1.0
@@ -163,6 +164,8 @@ do while(max(differenceP, differenceW) > eps)
     G = Gfunction(P0, W0, matrPfromW, N/2)
     A = dFdxForNewton(matrApconvert, matrPfromW, dt, N/2, xx, fluidParams, P0, W0, hh)
     Ainvert(1:N,1:N) = invertMatrix(A, N)
+    xtmp(1:N) = (/ (j, j=1,N)/)
+    call Grafik2D(xtmp,xtmp,A,N,'matrix.plt')
     !call PrintMatrix(matrPfromW,N/2,N/2)
     !call PrintMatrix(A,N,N)
     !call PrintMatrix(Ainvert,N,N)
@@ -512,14 +515,14 @@ integer, intent (IN) :: NN
 character(*), intent (IN) :: filename 
 integer :: i,j 
 open(unit=48,file=filename)
-!write(48, '(A)') 'Variables = X, Y, F'                      ! не знаю, как оформить аналог для gnuplot 
-!write(48, '(A,I4,A,I4)') 'zone I = ', NN, ' J = ', NN       ! но как gnuplot знает как точки соединять в сетку?
+write(48, '(A)') 'Variables = X, Y, F'                      ! не знаю, как оформить аналог для gnuplot 
+write(48, '(A,I4,A,I4)') 'zone I = ', NN, ' J = ', NN       ! но как gnuplot знает как точки соединять в сетку?
 do i = 1, NN
     do j = 1, NN 
       if (Func(i,j) < 0) then
-        write (48,'(F8.6,F9.6,E12.4)') X(j), Y(i), Func(i,j)
+        write (48,'(F12.6,F13.6,E12.4)') X(j), Y(i), Func(i,j)
       else
-        write (48,'(F8.6,F9.6,E11.4)') X(j), Y(i), Func(i,j)
+        write (48,'(F12.6,F13.6,E11.4)') X(j), Y(i), Func(i,j)
       end if
           
         !write (48,'(3(E12.4))') X(j), Y(i), Func(i,j)
@@ -530,7 +533,7 @@ do i = 1, NN
         ! если поствить "F" вместо "E", то будт запись с фиксированной точкой, посмотрите, что получится. 
         ! 3 - в "3(E14.4)" значит,что таких чисел будет 3 в строе
     end do
-    write (48,*)
+    !write (48,*)
 end do
 close(48)
 end subroutine 
