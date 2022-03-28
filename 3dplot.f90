@@ -3,7 +3,7 @@ use functionsFG                     ! функции удобно выносит
 use elasticRadial
 use radialAnalyt
 implicit none                       ! это запрещает использование неописанных переменных 
-integer, parameter :: Nmax = 8! позволяет менять размеры сразу у всех массивов
+integer, parameter :: Nmax = 4! позволяет менять размеры сразу у всех массивов
 real(8), dimension(Nmax/2) :: P, W, Wn, P0, W0, P1, W1
 real(8), dimension(Nmax) :: relax  
 real(8) :: eps, hh, lambda
@@ -14,10 +14,10 @@ integer :: NN05         ! size of subvectors w, and p
 real(8) :: Rfrac       ! elastic and mesh parameters    !TODO: make common subroutine for all parameters
 real(8) :: matrWfromP(Nmax/2,Nmax/2), matrPfromW(Nmax/2,Nmax/2)          ! matrix for w_k = T^s_k*p_s
 type(TfluidParams) :: fluidParams   ! parameters for fluid
-real(8) :: matrAp(3,Nmax/2), matrAp2(3,Nmax/2), matrAp3(3,Nmax/2)       ! fluid matrix [3,1..NN] with boundary conditions
+real(8) :: matrAp(3,Nmax/2), matrAp2(3,Nmax/2), matrAp3(3,Nmax/2), matrAp4(3,Nmax/2)       ! fluid matrix [3,1..NN] with boundary conditions
 real(8) :: RHS(1,1:Nmax)              ! Right hand side [1,1..NN] with boundary conditions
 real(8) :: Xcentr(1:Nmax/2), Xbound(0:Nmax/2)               ! mesh, cell centers [1..NN] and cell boundaries [0;Rfrac], [0..NN]
-real    :: timeNewton, timeRelax, timePrev, t(2), etime, timeLevenbergMarkvardt ! Нужно ли здесь сделать t(3)?
+real    :: timeNewton, timeRelax, timePrev, t(2), etime, timeLevenbergMarkvardt, timePikar ! Нужно ли здесь сделать t(3)?
 real(8) :: TimeFracCurr, TimeFracPrev, RfracPrev    ! current and previous time of fracture propagaton, radius at previous time moment
 real(8) :: Ep, ElasticCoef                          ! E/(1-nu^2), 8/pi/Ep
 
@@ -29,15 +29,15 @@ NN05 = Nmax/2   ! размер каждого вектора w, p
 !call testFluidMatrixRadial()    
 ! set parameters (!!!!! p[MPa], w[mm], mu[MPa*s])
 call setFluidParamsForTest(fluidParams)         
-Rfrac = 30.d0   
-fluidParams%mu = 0.1/1.d6  ! mu[MPa*s]
+Rfrac = 4.d0   
+fluidParams%mu = 1.d0/1.d6  ! mu[MPa*s]
 Ep = 20.d0 / (1-0.25d0**2)  ! E[GPa]
 !fluidParams%mu = 0.1d0  ! mu[Pa*s]
 !Ep = 20.d0 / (1-0.25d0**2) * 1.e9 ! E[Pa]
 
 ElasticCoef = 8.d0/3.14159265d0/Ep
 fluidParams%qin = 0.01d0 
-fluidParams%dt = 10000.d0
+fluidParams%dt = 100.d0
 fluidParams%pout = 0.0d0      ! can be varied in [-0.001d0;0.001d0]
 Xbound(0:NN05) = (/ (i, i = 0, NN05) /) * Rfrac/NN05
 !Xcentr(1:NN05) = (/ (i, i = 1, NN05) /) * Rfrac/NN05 + (Rfrac/NN05)/2
@@ -65,7 +65,6 @@ Wn = 0.d0
 ! initial step, to make fluid matrix 
 call makeElasticMatrixRadial(Xbound,Rfrac,NN05, matrWfromP)    
 matrPfromW = invertMatrix(matrWfromP(1:NN05,1:NN05), NN05)  
-!call PrintMatrix(matrPfromW,NN05,NN05)
 P = fluidParams%pout
 P = 0.01d0
 W(1:NN05) = matmul(matrWfromP(1:NN05,1:NN05),P(1:NN05))*ElasticCoef
@@ -80,12 +79,12 @@ call makeFluidMatrixAndRHSRadial(Xcentr,NN05,fluidParams,W,Wn,matrAp,RHS)
 ! для обобщения будет удобнее с matrPfromW, но можно начать с любого варианта
 ! matrPfromW, matrWfromP считаются один раз и записаны как обычные матрицы
 
-eps = 1.d-8
+eps = 1.d-5
 hh = Xcentr(2)-Xcentr(1)
 do i = 1, Nmax/2
-    print *, Xcentr(i)
+    print *, 'x = ', Xcentr(i)
 end do
-print *, hh
+print *,'h = ',hh
 !call PrintMatrix(matrPfromW, NN05, NN05)
 P0(1:NN05) = 1.d-3  ! начальное приближение
 W0(1:NN05) = 1.d-2
@@ -93,6 +92,8 @@ PRINT*,"Newton's method:"
 
 matrAp2(1:3,1:NN05) = matrAp(1:3,1:NN05)  ! matrAp после метода Ньютона возвращается видоизмененной, поэтому запоминаю ее первоначальный вид в matrAp2
 matrAp3(1:3,1:NN05) = matrAp(1:3,1:NN05)
+matrAp4(1:3,1:NN05) = matrAp(1:3,1:NN05)
+!call PrintMatrix(matrPfromW,NN05,NN05)
 
 timePrev = etime( t )
 call NewtonMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, fluidParams%pout, &
@@ -117,12 +118,20 @@ call Grafik1D(Xcentr,W0,NN05,'RelaxW.plt')
 PRINT*,"LevenbergMarkvardts method :"
 P0(1:NN05) = 1.d-3  ! начальное приближение
 W0(1:NN05) = 1.d-2
-!lambda = 0.000001d0 ! этот параметр нужно подбирать для каждого N - начальный регуляционный параметр
-lambda = 100.d0
+lambda = 10.d0 ! этот параметр нужно подбирать для каждого N - начальный регуляционный параметр
+!lambda = 0.0000000001d0
 timePrev = etime( t )
 call MethodLevenbergMarkvardt(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, fluidParams%pout, &
     pi, hh, eps, lambda, matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp3(1:3,1:NN05), fluidParams)
 timeLevenbergMarkvardt = etime( t ) - timePrev
+
+PRINT*,"Pikars method :"
+P0(1:NN05) = 1.d-3  ! начальное приближение
+W0(1:NN05) = 1.d-2
+timePrev = etime( t )
+call PikarMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, fluidParams%pout, &
+    pi, hh, eps, matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp4(1:3,1:NN05), fluidParams, Wn)
+timePikar = etime( t ) - timePrev
 
 call Grafik1D(Xcentr,P0,NN05,'LevenbergMarkvardtP.plt')
 call Grafik1D(Xcentr,W0,NN05,'LevenbergMarkvardtW.plt')
@@ -133,4 +142,5 @@ call Grafik1D(Xcentr,W0,NN05,'LevenbergMarkvardtW.plt')
 write(*,'(A,F8.3,A)') 'time Newton = ', timeNewton, ' s'
 write(*,'(A,F8.3,A)') 'time Relax  = ', timeRelax , ' s'
 write(*,'(A,F8.3,A)') 'time LevenbergMarkvardt  = ', timeLevenbergMarkvardt , ' s'
+write(*,'(A,F8.3,A)') 'time Pikar  = ', timePikar , ' s'
 END PROGRAM demo

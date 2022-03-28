@@ -146,7 +146,7 @@ differenceP = 1.0
 differenceW = 1.0 
 !WprevTimeStep = 0.d0
 open(10,file = 'NewtonHist.plt')
-!write(10,'(A)') 'Variables = Iter, difP, difW'
+write(10,'(A)') 'Variables = Iter, difP, difW'
 Iter = 0
 do while(max(differenceP, differenceW) > eps)  
     Iter = Iter + 1
@@ -211,7 +211,7 @@ write(10,'(A)') 'Variables = Iter, difP, difW'
 Iter = 0
 nu = 10
 r = -1
-do while ((E > eps).and.(Iter < 1000)) 
+do while ((E > eps).and.(Iter < 10000)) 
 !do while ((max(differenceP, differenceW) > eps).and.(Iter < 10000000))  
     Iter = Iter + 1
     call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
@@ -237,32 +237,32 @@ do while ((E > eps).and.(Iter < 1000))
             !Wn(i) = Wn(i) - (1/lambda)*2*(JT(i+N/2,k)*F(k) + JT(i+N/2,k+N/2)*G(k))
         end do
     end do
-    call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,Wn,WprevTimeStep,matrAp,RHS)
-    matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
-    Fn = Ffunction(Pn, Wn, WprevTimeStep, dt, hh, pi, qin,pout, xx, matrApconvert, N/2)
-    Gn = Gfunction(Pn, Wn, matrPfromW, N/2)
-    En=0.d0
+    !call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,Wn,WprevTimeStep,matrAp,RHS)
+    !matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp
+    !Fn = Ffunction(Pn, Wn, WprevTimeStep, dt, hh, pi, qin,pout, xx, matrApconvert, N/2)
+    !Gn = Gfunction(Pn, Wn, matrPfromW, N/2)
+    !En=0.d0
     E=0.d0
     do i = 1, N/2 
-        En = En + Fn(i)*Fn(i) + Gn(i)*Gn(i) ! берем такую фукцию ошибки
+        !En = En + Fn(i)*Fn(i) + Gn(i)*Gn(i) ! берем такую фукцию ошибки
         E = E + F(i)*F(i) + G(i)*G(i)
     end do
     !print*, 'En = ', En, 'E = ',  E
-    if (En < E) then
+    !if (En < E) then
         P0(1:N/2) = Pn(1:N/2)
         W0(1:N/2) = Wn(1:N/2)  
-        r = -1
-        lambda = lambda*(1.d0/nu)!lambda_{k} = lambda_{k-1}*nu^r - меняем параметр
-        print*, 'here'
-    else  
-        r = r + 1
-        l = r
-        do while (l > 0)
-            lambda = lambda*nu !lambda_{k} = lambda_{k-1}*nu^r - меняем параметр
-            l = l - 1
-        end do
-    end if
-    print *, 'l = ', lambda
+    !    r = -1
+    !    lambda = lambda*(1.d0/nu)!lambda_{k} = lambda_{k-1}*nu^r - меняем параметр
+        !print*, 'here'
+    !else  
+    !    r = r + 1
+    !    l = r
+    !    do while (l > 0)
+    !        lambda = lambda*nu !lambda_{k} = lambda_{k-1}*nu^r - меняем параметр
+    !        l = l - 1
+    !    end do
+    !end if
+    !print *, 'l = ', lambda
     differenceP = maxval( ABS(P0(1:N/2)-Pn(1:N/2)) )    
     differenceW = maxval( ABS(W0(1:N/2)-Wn(1:N/2)) )
     write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW
@@ -276,7 +276,104 @@ do i = 1, N/2
 end do
 Print*, Iter, '= LevenbergMarkvardts iterations'
 end subroutine
-    
+
+function MatrixForPikar(matrAp, matrPfromW, dt, N, xx, fluidParams, hh) result(Aout) 
+type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
+integer, intent (IN) :: N
+real(8) :: dt, hh
+real(8) :: matrPfromW(N,N), matrAp(N, N) 
+real(8), dimension(2*N,2*N) :: Aout
+real(8) :: xx(1:N)          ! in makeFluidMatrixAndRHSRadial cell centres are used
+real(8), dimension(N) :: P, W
+integer:: i, j
+Aout = 0.d0
+!1 четверть
+do i = 1, N
+    do j = 1, N
+        Aout(i,j) = - matrAp(i,j)
+    enddo
+enddo
+!2 четверть
+do j = 1, N-1
+    Aout(j,j+N) = 1.d0/dt
+enddo
+!3 четверть
+do j = 1, N
+    Aout(j+N,j) = 1.d0
+enddo
+!4 четверть
+do j = 1, N
+do i = 1, N
+    Aout(i+N,j+N) = - matrPfromW(i,j)
+enddo
+enddo
+end function
+
+subroutine PikarMethod(P0, W0, N, dt, qin, pout, pi, hh, eps, matrPfromW, xx, matrAp, fluidParams, WprevTimeStep)
+type(TfluidParams),intent(IN) :: fluidParams   ! parameters for fluid
+integer:: N, i, j, Iter
+real(8) :: hh, dt, pi, qin, pout, eps, differenceP, differenceW
+real(8), dimension(N/2) :: P0, W0, F, G, Pn, Wn, xx, P00, W00, D1, D2 !P0, W0 - первое приближение, а P00, W00 - точка, в которой считаем значение функции для линейной части
+real(8) :: matrPfromW(N/2,N/2), matrAp(3, N/2), matrApconvert(N/2, N/2), matrAp0(3, N/2), matrApconvert0(N/2, N/2)  !matrAp0, matrApconvert0 - для точки P00, W00
+real(8), dimension(1:N, 1:N) :: Ainvert
+real(8), dimension(N, N) :: A
+real(8), intent(IN) :: WprevTimeStep(1:N/2)     ! width distribution at previous time step
+real(8) :: RHS(1,1:N/2)               ! right hand side of fluid equation. is not used here
+!real(8) :: xBound(0:N/2)            ! coordinates of cell boundaries (not centr)
+
+!xBound(1:N/2) = xx(1:N/2)+0.5d0*(xx(2)-xx(1))   ;   xBound(0) = xx(1)-0.5d0*(xx(2)-xx(1))     ! temporary calculate boundaries here (do it at mash forming)
+differenceP = 1.0
+differenceW = 1.0 
+!WprevTimeStep = 0.d0
+open(10,file = 'PikarHist.plt')
+write(10,'(A)') 'Variables = Iter, difP, difW'
+Iter = 0
+P00(1:N/2) = 0.5*P0(1:N/2)
+W00(1:N/2) = 0.5*W0(1:N/2)
+call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W00,WprevTimeStep,matrAp0,RHS)
+matrApconvert0(1: N/2, 1: N/2) = ConvertMatrix(matrAp0, N/2)  !конвертирую матрицу matrAp
+A = MatrixForPikar(matrApconvert0, matrPfromW, dt, N/2, xx, fluidParams, hh)
+Ainvert(1:N,1:N) = invertMatrix(A, N) !обращаем матрицу только один раз (в точке P00, W00)
+do while(max(differenceP, differenceW) > eps)  
+    Iter = Iter + 1
+    do i = 1, N/2
+        Print*, P0(i), ' P0 '
+    end do
+    do i = 1, N/2
+        Print*, W0(i), ' W0 '
+    end do
+    Print*, '    '
+    !call PrintMatrix(matrPfromW,N/2,N/2)
+    !call PrintMatrix(A,N,N)
+    !call PrintMatrix(Ainvert,N,N)
+    !call PrintMultMatrix(A,Ainvert,N)
+    call makeFluidMatrixAndRHSRadial(xx,N/2,fluidParams,W0,WprevTimeStep,matrAp,RHS)
+    matrApconvert(1: N/2, 1: N/2) = ConvertMatrix(matrAp, N/2)  !конвертирую матрицу matrAp (в точке P0, W0)
+    D1(1:N/2) = matmul(matrApconvert(1: N/2, 1: N/2), P0(1:N/2)) 
+    D2(1:N/2) = matmul(matrApconvert0(1: N/2, 1: N/2), P0(1:N/2)) 
+    D1(1) = D1(1) - qin / (2.d0*pi) / xx(1) / hh
+    do i = 1, N/2
+        do j = 1, N/2
+            Pn(i) = Ainvert(i,j)*(D1(i) - D2(i)) + Ainvert(i,j+N/2)*0
+            Wn(i) = Ainvert(i+N/2,j)*(D1(i) - D2(i)) + Ainvert(i+N/2,j+N/2)*0
+        end do
+    end do
+    differenceP = maxval( ABS(P0(1:N/2)-Pn(1:N/2)) )    
+    differenceW = maxval( ABS(W0(1:N/2)-Wn(1:N/2)) )
+    P0(1:N/2) = Pn(1:N/2)
+    W0(1:N/2) = Wn(1:N/2)
+    write(10,'(I6, 2(E16.6))') Iter, differenceP, differenceW
+end do
+close(10)
+do i = 1, N/2
+    Print*, P0(i), ' P0 '
+end do
+do i = 1, N/2
+    Print*, W0(i), ' W0 '
+end do
+Print*, Iter, '= Pikars iterations'
+end subroutine
+
 function invertMatrix(Ain, NN) result(Aout) 
 real(8), intent (IN) :: Ain(:,:)      
 integer, intent (IN) :: NN
