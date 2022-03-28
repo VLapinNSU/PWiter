@@ -55,7 +55,7 @@ WprevTimeStep = 0.d0
 open(10,file = 'RelaxHist.plt')
 write(10,'(A)') 'Variables = Iter, difP, difW'
 Iter = 0
-do while(max(differenceP, differenceW) > eps)  
+do while ((max(differenceP, differenceW) > eps).and.(Iter<100000))
     Iter = Iter + 1
     !do i = 1, N/2
     !    Print*, P0(i)
