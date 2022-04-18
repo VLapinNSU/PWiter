@@ -79,7 +79,7 @@ call makeFluidMatrixAndRHSRadial(Xcentr,NN05,fluidParams,W,Wn,matrAp,RHS)
 ! для обобщения будет удобнее с matrPfromW, но можно начать с любого варианта
 ! matrPfromW, matrWfromP считаются один раз и записаны как обычные матрицы
 
-eps = 1.d-5
+eps = 1.d-8
 hh = Xcentr(2)-Xcentr(1)
 do i = 1, Nmax/2
     print *, 'x = ', Xcentr(i)
@@ -118,12 +118,15 @@ call Grafik1D(Xcentr,W0,NN05,'RelaxW.plt')
 PRINT*,"LevenbergMarkvardts method :"
 P0(1:NN05) = 1.d-3  ! начальное приближение
 W0(1:NN05) = 1.d-2
-lambda = 10.d0 ! этот параметр нужно подбирать для каждого N - начальный регуляционный параметр
+lambda = 1.d0 ! этот параметр нужно подбирать для каждого N - начальный регуляционный параметр
 !lambda = 0.0000000001d0
 timePrev = etime( t )
 call MethodLevenbergMarkvardt(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, fluidParams%pout, &
     pi, hh, eps, lambda, matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp3(1:3,1:NN05), fluidParams)
 timeLevenbergMarkvardt = etime( t ) - timePrev
+
+call Grafik1D(Xcentr,P0,NN05,'LevenbergMarkvardtP.plt')
+call Grafik1D(Xcentr,W0,NN05,'LevenbergMarkvardtW.plt')
 
 PRINT*,"Pikars method :"
 P0(1:NN05) = 1.d-3  ! начальное приближение
@@ -133,8 +136,8 @@ call PikarMethod(P0(1:NN05), W0(1:NN05), NN, fluidParams%dt, fluidParams%qin, fl
     pi, hh, eps, matrPfromW(1:NN05,1:NN05), Xcentr(1:NN05), matrAp4(1:3,1:NN05), fluidParams, Wn)
 timePikar = etime( t ) - timePrev
 
-call Grafik1D(Xcentr,P0,NN05,'LevenbergMarkvardtP.plt')
-call Grafik1D(Xcentr,W0,NN05,'LevenbergMarkvardtW.plt')
+call Grafik1D(Xcentr,P0,NN05,'PikarP.plt')
+call Grafik1D(Xcentr,W0,NN05,'PikarW.plt')
 
 ! Кажется, я нашла причину, почему метод релаксации и метод Ньютона выдавали разные результаты. Система имеет несколько решений и если взять начальные приближения не достаточно близкими к некоторому корню системы, то методы выдают разные корни. Я взяла начальное приближение близкое к тому корню, что выдал метод релаксации и метод Ньютона сошелся к тому же корню, что и метод релаксации.
 ! Я нашла онлайн решение системы для N=2 (т.е. система из 4 уравнений) и у нее есть два решения. Думаю, аналогично и для больших N.
